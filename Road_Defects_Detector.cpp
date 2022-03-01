@@ -85,7 +85,9 @@ string yoloModelWeights = yoloBasePath + "yolov3_proj_best_2541-mAP.weights";
 //string bag_path = "E:/20210925_172641.bag";//28G
 //string bag_path = "C:/Users/hedey/Documents/eng.hedeya/eslam test.bag";
 //string bag_path = "C:/Users/hedey/Documents/eng.hedeya/20211023_111231.bag";
-string bag_path = "C:/Users/hedey/Documents/20211008_130710.bag";//important: 2 good potholes
+
+//string bag_path = "C:/Users/hedey/Documents/20211008_130710.bag";//important: 2 good potholes
+
 //string bag_path = "C:/Users/hedey/Documents/20211008_130835.bag";//important: shadows - 1 pothole
 //string bag_path = "C:/Users/hedey/Documents/20211127_150031.bag";//last - cracks
 //string bag_path = "C:/Users/hedey/Documents/20211008_130932.bag";
@@ -356,10 +358,10 @@ void fit_plane(PointT p1, PointT p2, PointT p3, float& a, float& b, float& c, fl
 int main(int argc, char* argv[]) try
 {
     
-    string yoloBasePath = argv[1];
+    string yoloBasePath = argv[2];
     string yoloClassesFile = yoloBasePath + "Proj_obj-13.names";
     string yoloModelConfiguration = yoloBasePath + "yolov3_proj.cfg";
-    string yoloModelWeights = yoloBasePath + argv[2];
+    string yoloModelWeights = yoloBasePath + argv[3];
     
     if (argc > 0)
     {
@@ -387,7 +389,8 @@ int main(int argc, char* argv[]) try
     // Start streaming with default recommended configuration
     //pipe.start();
     rs2::config cfg;
-    cfg.enable_device_from_file(bag_path);
+    //cfg.enable_device_from_file(bag_path);
+    cfg.enable_device_from_file(argv[1]);
 
     //pipe.start(cfg); // Load from file
     rs2::pipeline_profile profile = pipe.start(cfg);
@@ -438,12 +441,12 @@ int main(int argc, char* argv[]) try
     //for (int k = 0; k < 100; k++)
     //for (int k = 0; k < 250; k++)
     //for (int k = 0; k < 1200; k++)
-    //{
-    //    data = pipe.wait_for_frames();
-    //    f += 1;
-    //}
+    for (int k = 0; k <= stoi(argv[8]); k++)
+    {
+        data = pipe.wait_for_frames();
+        f += 1;
+    }
     
-
     //while (waitKey(1) < 0 && getWindowProperty(window_name, WND_PROP_AUTOSIZE) >= 0)
     while (true)
         //while(!viewer->wasStopped()) && waitKey(1)< 0 && getWindowProperty(window_name, WND_PROP_AUTOSIZE) >= 0
@@ -454,16 +457,19 @@ int main(int argc, char* argv[]) try
         // Creating align object is an expensive operation
         // that should not be performed in the main loop
         
-        for (int k = 0; k < 2; k++)
+        //for (int k = 0; k < 2; k++)
+        for (int k = 0; k <= stoi(argv[9]); k++)
         {
             data = pipe.wait_for_frames();
             f += 1;
         }
         
-
         //rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
-        data = pipe.wait_for_frames();
-        f += 1;
+        if (argv[9] <= 0)
+        {
+            data = pipe.wait_for_frames();
+            f += 1;
+        }
         auto startTime_alignment_process = std::chrono::steady_clock::now();
         data_aligned_to_color = align_to_color.process(data);
         /*
@@ -520,9 +526,9 @@ int main(int argc, char* argv[]) try
         //compression_params.push_back(100);
 
         //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/"+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
-        imwrite(argv[3]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
+        imwrite(argv[4]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
-        detectObjects(f,imageRGB, argv[4], bBoxes, confThreshold, nmsThreshold,
+        detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
             yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
 
         // Clear viewer
@@ -696,7 +702,7 @@ int main(int argc, char* argv[]) try
                 Cloud_Filter.filter(*newCloud);              // Filtered Cloud Outputted
                 */
 
-                
+                pointProcessorI->savePcd(cloud, argv[7]+ zero_padding(std::to_string(f), 5) + "_original" + ".pcd");
                 pcl::PointCloud<Cloud_Type>::Ptr filterCloud = pointProcessorI->FilterCloud(cloud, 0.1f, Eigen::Vector4f(ROI_xmin, ROI_ymin, ROI_zmin, 1), Eigen::Vector4f(ROI_xmax, ROI_ymax, ROI_zmax, 1)); //Best
                 float avg_dist = average_distance<Cloud_Type>(cloud);
                 /*
@@ -975,7 +981,7 @@ int main(int argc, char* argv[]) try
                                 }
                                 cv::imshow("RGB_out", rgb_out);
                                 //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
-                                imwrite(argv[5] + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                imwrite(argv[6] + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
 
                                 //}
                                 //if(render_box)
