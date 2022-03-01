@@ -522,7 +522,7 @@ int main(int argc, char* argv[]) try
         //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/"+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
         imwrite(argv[3]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
-        detectObjects(f,imageRGB, bBoxes, confThreshold, nmsThreshold,
+        detectObjects(f,imageRGB, argv[4], bBoxes, confThreshold, nmsThreshold,
             yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
 
         // Clear viewer
@@ -974,7 +974,8 @@ int main(int argc, char* argv[]) try
 
                                 }
                                 cv::imshow("RGB_out", rgb_out);
-                                imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                imwrite(argv[5] + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
 
                                 //}
                                 //if(render_box)
