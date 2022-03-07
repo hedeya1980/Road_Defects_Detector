@@ -23,6 +23,9 @@
 #include <cstdio>
 #include <limits>
 
+#include <ctime>
+//#include "date/date.h"
+
 // PCL Headers
 /*
 #include <pcl/io/pcd_io.h>
@@ -56,9 +59,6 @@
 #include <pcl/kdtree/kdtree_flann.h>
 
 namespace fs = std::filesystem;
-std::string test_input_path = "G:/My Drive/examples/Egypt_examples";
-//std::string test_output_path = "C:/Users/hedey/source/repos/Road_Defects_Detector/Test_output";
-
 
 // object detection
 /*
@@ -104,6 +104,16 @@ string yoloModelWeights = yoloBasePath + "yolov3_proj_best_2541-mAP.weights";
 //cfg.enable_device_from_file("C:/Users/hedey/Documents/20210925_172641.bag");//28G
 //cfg.enable_device_from_file("C:/Users/hedey/Documents/20211008_133012.bag");
 //cfg.enable_device_from_file("C:/Users/hedey/Documents/20211008_132819.bag");
+/*
+std::chrono::system_clock::time_point
+to_chrono_time_point(double d)
+{
+    using namespace std::chrono;
+    using namespace date;
+    using ddays = duration<double, days::period>;
+    return sys_days{ December / 30 / 1899 } + round<system_clock::duration>(ddays{ d });
+}
+*/
 
 template<typename PointT>
 float average_distance(typename pcl::PointCloud<PointT>::Ptr inputCloud)
@@ -263,7 +273,7 @@ void initCamera(CameraAngle setAngle, pcl::visualization::PCLVisualizer::Ptr& vi
     viewer->initCameraParameters();
     // distance away in meters
     //int distance = 5;
-    int distance = 0;
+    int distance = 1;
     //int distance = 1;
 
     switch (setAngle)
@@ -362,23 +372,22 @@ int main(int argc, char* argv[]) try
     string yoloClassesFile = yoloBasePath + "Proj_obj-13.names";
     string yoloModelConfiguration = yoloBasePath + "yolov3_proj.cfg";
     string yoloModelWeights = yoloBasePath + argv[3];
-    
-    if (argc > 0)
-    {
-        for (int i = 0; i < argc; i++)
-        {
-            std::cout << argv[i] << std::endl;
-        }
-    }
+    string yoloFaceModelWeights = yoloBasePath + "yolov3-wider_16000.weights";
+
+    string yoloFaceClassesFile = yoloBasePath + "face.names";
+    string yoloFaceModelConfiguration = yoloBasePath + "yolov3-face.cfg";
 
 
-    for (const auto& entry : fs::directory_iterator(test_input_path))
-        std::cout << entry.path() << std::endl;
     // load class names from file
     vector<string> classes;
     ifstream ifs(yoloClassesFile.c_str());
     string line;
     while (getline(ifs, line)) classes.push_back(line);
+    vector<string> face_classes;
+    ifstream fifs(yoloFaceClassesFile.c_str());
+    string fline;
+    while (getline(fifs, fline)) face_classes.push_back(fline);
+
 
     typedef pcl::PointXYZRGB Cloud_Type;
     // Declare depth colorizer for pretty visualization of depth data
@@ -485,7 +494,26 @@ int main(int argc, char* argv[]) try
         rs2::depth_frame depth = data_aligned_to_color.get_depth_frame();//.apply_filter(color_map);
         rs2::frame depth2 = data_aligned_to_color.get_depth_frame().apply_filter(color_map);
         rs2::frame RGB = data_aligned_to_color.get_color_frame();
-        
+
+        std::cout << "depth2 time_stamp: " << depth2.get_timestamp() << std::endl;
+        std::cout << "RGB_pc time_stamp: " << RGB_pc.get_timestamp() << std::endl;
+        std::cout << "RGB time_stamp: " << RGB.get_timestamp() << std::endl;
+        std::cout << "RGB time_stamp_domain: " << RGB.get_frame_timestamp_domain() << std::endl;
+
+        /*
+        // current date/time based on current system
+        time_t now = RGB.get_timestamp();
+
+        // convert now to string form
+        char* dt = ctime(&now);
+
+        cout << "The local date and time is: " << dt << endl;
+
+        // convert now to tm struct for UTC
+        tm* gmtm = gmtime(&now);
+        dt = asctime(gmtm);
+        cout << "The UTC date and time is:" << dt << endl;
+        */
         std::cout << "-----------------------------------------------------------------------" << std::endl;
 
         auto endTime_alignment = std::chrono::steady_clock::now();
@@ -509,7 +537,7 @@ int main(int argc, char* argv[]) try
         Mat image(Size(w, h), CV_8UC3, (void*)depth2.get_data(), Mat::AUTO_STEP);
 
         Mat imageRGB(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB.get_data(), Mat::AUTO_STEP);
-        //Mat imageRGB(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB_pc.get_data(), Mat::AUTO_STEP);
+        Mat imageRGB_pc(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB_pc.get_data(), Mat::AUTO_STEP);
         cv::Mat rgb_out = imageRGB.clone();
 
         // Update the window with new data
@@ -520,6 +548,7 @@ int main(int argc, char* argv[]) try
         float nmsThreshold = 0.4;//0.5
         bool bVis = true;
         std::vector<BoundingBox> bBoxes;
+        std::vector<BoundingBox> face_bBoxes;
 
         //std::vector<int> compression_params;
         //compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
@@ -530,6 +559,9 @@ int main(int argc, char* argv[]) try
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
         detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
             yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
+        detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, confThreshold, nmsThreshold,
+            yoloBasePath, face_classes, yoloFaceModelConfiguration, yoloFaceModelWeights, bVis);
+
 
         // Clear viewer
         //viewer->removeAllPointClouds();
@@ -656,12 +688,18 @@ int main(int argc, char* argv[]) try
                 float projected_xmin, projected_ymin, projected_zmin, projected_xmax, projected_ymax, projected_zmax;
                 if (classes[bBox.classID] == "Potholes")
                 {
-                    projected_xmin = std::max(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), minPt.x);
-                    projected_ymin = std::max(std::min(Point3d_tl_depth[1], Point3d_tr_depth[1]), minPt.y);
-                    projected_zmin = std::max(std::min(Point3d_bl_depth[2], Point3d_br_depth[2]), minPt.z);
-                    projected_xmax = std::min(std::max(Point3d_tr_depth[0], Point3d_br_depth[0]), maxPt.x);
-                    projected_ymax = std::min(std::max(Point3d_bl_depth[1], Point3d_br_depth[1]), maxPt.y);
-                    projected_zmax = std::min(std::max(Point3d_tl_depth[2], Point3d_tr_depth[2]), maxPt.z);
+                    //projected_xmin = std::max(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), minPt.x);
+                    //projected_ymin = std::max(std::min(Point3d_tl_depth[1], Point3d_tr_depth[1]), minPt.y);
+                    projected_xmin = std::max(std::min(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), std::min(Point3d_br_depth[0], Point3d_tr_depth[0])), minPt.x);
+                    projected_ymin = std::max(std::min(std::min(Point3d_tl_depth[1], Point3d_tr_depth[1]), std::min(Point3d_bl_depth[1], Point3d_br_depth[1])), minPt.y);
+                    //projected_zmin = std::max(std::min(Point3d_bl_depth[2], Point3d_br_depth[2]), minPt.z);
+                    projected_zmin = std::max(std::min(std::min(Point3d_bl_depth[2], Point3d_br_depth[2]), std::min(Point3d_tl_depth[2], Point3d_tr_depth[2])), minPt.z);
+                    //projected_xmax = std::min(std::max(Point3d_tr_depth[0], Point3d_br_depth[0]), maxPt.x);
+                    projected_xmax = std::min(std::max(std::max(Point3d_tr_depth[0], Point3d_br_depth[0]), std::max(Point3d_tl_depth[0], Point3d_bl_depth[0])), maxPt.x);
+                    //projected_ymax = std::min(std::max(Point3d_bl_depth[1], Point3d_br_depth[1]), maxPt.y);
+                    projected_ymax = std::min(std::max(std::max(Point3d_bl_depth[1], Point3d_br_depth[1]), std::max(Point3d_tl_depth[1], Point3d_tr_depth[1])), maxPt.y);
+                    //projected_zmax = std::min(std::max(Point3d_tl_depth[2], Point3d_tr_depth[2]), maxPt.z);
+                    projected_zmax = std::min(std::max(std::max(Point3d_tl_depth[2], Point3d_tr_depth[2]), std::max(Point3d_bl_depth[2], Point3d_br_depth[2])), maxPt.z);
                 }
                 else
                 {
@@ -672,11 +710,14 @@ int main(int argc, char* argv[]) try
                     projected_ymax = std::min(std::min(Point3d_bl_depth[1], Point3d_br_depth[1]), maxPt.y);
                     projected_zmax = std::min(std::min(Point3d_tl_depth[2], Point3d_tr_depth[2]), maxPt.z);
                 }
+                /*
                 float x_dist = projected_xmax - projected_xmin;
                 float y_dist = projected_ymax - projected_ymin;
                 float z_dist = projected_zmax - projected_zmin;
                 float ROImin_x = Point3d_cc_depth[0] - x_dist / 2;
+                //float ROImin_x = (Point3d_cc_depth[0] - projected_xmin) / x_dist;
                 float ROImin_y = Point3d_cc_depth[1] - y_dist / 2;
+                //float ROImin_y = (Point3d_cc_depth[1] - projected_ymin) / y_dist;
                 //float ROImin_z = Point3d_cc_depth[2] - z_dist / 2;
                 float ROImin_z = projected_zmin;
                 float ROImax_x = Point3d_cc_depth[0] + x_dist / 2;
@@ -690,7 +731,21 @@ int main(int argc, char* argv[]) try
                 float ROI_xmax = std::min(std::max(ROImin_x, ROImax_x), maxPt.x);
                 float ROI_ymax = std::min(std::max(ROImin_y, ROImax_y), maxPt.y);
                 float ROI_zmax = projected_zmax;
-
+                */
+                
+                //float ROI_xmin = std::max(std::min(projected_xmin, projected_xmax), minPt.x);
+                float ROI_xmin = projected_xmin;
+                //float ROI_ymin = std::max(std::min(projected_ymin, projected_ymax), minPt.y);
+                float ROI_ymin = projected_ymin;
+                //float ROI_zmin = std::max(Point3d_tl_depth[2], minPt.z);
+                float ROI_zmin = projected_zmin;
+                //float ROI_xmax = std::min(std::max(projected_xmax, projected_xmin), maxPt.x);
+                float ROI_xmax = projected_xmax;
+                //float ROI_ymax = std::min(std::max(projected_ymax, projected_ymin), maxPt.y);
+                float ROI_ymax = projected_ymax;
+                //float ROI_zmax = std::min(Point3d_br_depth[2], maxPt.z);
+                float ROI_zmax = projected_zmax;
+                
                 //========================================
                 // Filter PointCloud (PassThrough Method)
                 //========================================

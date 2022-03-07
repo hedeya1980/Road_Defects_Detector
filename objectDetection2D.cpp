@@ -249,7 +249,7 @@ void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<Bound
         //cv::namedWindow( windowName, 1 );
         cv::namedWindow(windowName, cv::WINDOW_NORMAL);
         cv::imshow(windowName, visImg);
-        //cv::waitKey(0); // wait for key to be pressed
+        cv::waitKey(0); // wait for key to be pressed
 
         //cv::destroyWindow(windowName);
     }
