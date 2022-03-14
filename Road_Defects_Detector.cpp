@@ -557,10 +557,25 @@ int main(int argc, char* argv[]) try
         //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/"+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
         imwrite(argv[4]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
-        detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
-            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
         detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, confThreshold, nmsThreshold,
             yoloBasePath, face_classes, yoloFaceModelConfiguration, yoloFaceModelWeights, bVis);
+        for (auto fbBox : face_bBoxes)
+        {
+            Mat roi = imageRGB_pc(cv::Rect(std::max(fbBox.roi.x, 0), std::max(fbBox.roi.y, 0), std::min(fbBox.roi.width, w_rgb), std::min(fbBox.roi.height, h_rgb)));
+
+            for (int i = 0; i < roi.cols; i++)
+                for (int j = 0; j < roi.rows; j++) {
+                    cv::Vec3b p = roi.at<cv::Vec3b>(j, i);
+                    //unsigned char lumination = (unsigned char)(0.2126 * p[2] + 0.7152 * p[1] + 0.0722 * p[0]);
+                    p[0] = p[1] = p[2] = 255;
+                    roi.at<cv::Vec3b>(j, i) = p;
+                }
+        }
+
+        //detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
+        //    yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
+        detectObjects(f, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
+            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
 
 
         // Clear viewer
@@ -759,7 +774,7 @@ int main(int argc, char* argv[]) try
 
                 pointProcessorI->savePcd(cloud, argv[7]+ zero_padding(std::to_string(f), 5) + "_original" + ".pcd");
                 pcl::PointCloud<Cloud_Type>::Ptr filterCloud = pointProcessorI->FilterCloud(cloud, 0.1f, Eigen::Vector4f(ROI_xmin, ROI_ymin, ROI_zmin, 1), Eigen::Vector4f(ROI_xmax, ROI_ymax, ROI_zmax, 1)); //Best
-                float avg_dist = average_distance<Cloud_Type>(cloud);
+                //float avg_dist = average_distance<Cloud_Type>(cloud);
                 /*
                 pcl::PointCloud<Cloud_Type>::Ptr filterCloud;
                 pcl::PointCloud<Cloud_Type>::Ptr filterCloud = pointProcessorI->FilterCloud(newCloud, 0.1f, Eigen::Vector4f(ROI_xmin, ROI_ymin, ROI_zmin, 1), Eigen::Vector4f(ROI_xmax, ROI_ymax, ROI_zmax, 1)); //Best
@@ -807,7 +822,7 @@ int main(int argc, char* argv[]) try
 
                         //segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 3000, 0.03, coefficients); // Possible pavement defects //.01
                         //segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 3000, 26.557* avg_dist+0.0095, coefficients); // Possible pavement defects //.01
-                        segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 5000, pixel_distance_in_meters_cc/300, coefficients); // Possible pavement defects //.01
+                        segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc/300, coefficients); // Possible pavement defects //.01
                     ////}
                     ////else
                     ////{
