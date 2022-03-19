@@ -399,7 +399,8 @@ int main(int argc, char* argv[]) try
     //pipe.start();
     rs2::config cfg;
     //cfg.enable_device_from_file(bag_path);
-    cfg.enable_device_from_file(argv[1]);
+    cfg.enable_device_from_file(argv[1], false);
+    //cfg.enable_device_from_file(argv[1]);
 
     //pipe.start(cfg); // Load from file
     rs2::pipeline_profile profile = pipe.start(cfg);
@@ -421,22 +422,23 @@ int main(int argc, char* argv[]) try
     color_extrin_to_depth = color_profile.as<rs2::video_stream_profile>().get_extrinsics_to(depth_profile);
 
     rs2::device selected_device = profile.get_device();
+    //std::cout << selected_device.get_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION) << "\n";
     // get playback device and disable realtime mode
     auto playback = selected_device.as<rs2::playback>();
     playback.set_real_time(false);
 
+    int fps = 30;
     std::chrono::nanoseconds duration = playback.get_duration();
     std::cout << "File duration: " << duration.count() << std::endl;
-    float frame_count = duration.count() / (1e9);
-    std::cout << "frames: " << frame_count * 30 << std::endl;
+    float duration_s = duration.count() / (1e9);
+    float frame_count = duration_s * fps;
+    std::cout << "frames: " << frame_count << std::endl;
 
     using namespace cv;
     const auto depth_frame = "Depth Image";
     const auto color_frame = "Color Image";
     //namedWindow(depth_frame, WINDOW_AUTOSIZE);
     //namedWindow(color_frame, WINDOW_AUTOSIZE);
-    namedWindow(depth_frame, WINDOW_NORMAL);
-    cv::namedWindow("RGB_out", cv::WINDOW_NORMAL);
     
     //namedWindow(color_frame, WINDOW_NORMAL);
     Cloud_Type minPt, maxPt;
@@ -448,25 +450,46 @@ int main(int argc, char* argv[]) try
 
     boost::shared_ptr<pcl::visualization::PCLVisualizer> openCloud;
 
-    int f = 0;
+    //int f = 0;
     int first_f = 0;
     
     float progress = 0.0;
 
-    //for (int k = 0; k < 100; k++)
-    //for (int k = 0; k < 250; k++)
-    //for (int k = 0; k < 1200; k++)
+    uint32_t counter = 0;
+    uint64_t curPos;
+    uint64_t lastPos = 0;
+    int k = 0;
+    bool bFrame;
+    //for (int i=0;i < stoi(argv[8]);i++)
+    while(k< stoi(argv[8]))
+    {
+        //pipe.wait_for_frames();
+        pipe.try_wait_for_frames(&data);
+        curPos = playback.get_position();
+        if (curPos < lastPos)
+            break;
+        else
+        {
+            std::cout << "time between frames: " << curPos - lastPos << std::endl;
+            counter++;
+            lastPos = curPos;
+            k++;
+        }
+    }
+    /*
     for (int k = 0; k <= stoi(argv[8]); k++)
     {
         data = pipe.wait_for_frames();
         f += 1;
     }
+    */
     
     //while (waitKey(1) < 0 && getWindowProperty(window_name, WND_PROP_AUTOSIZE) >= 0)
-    while (true)
+    //while (true)
         //while(!viewer->wasStopped()) && waitKey(1)< 0 && getWindowProperty(window_name, WND_PROP_AUTOSIZE) >= 0
-    {
-        while (progress < 1.0) {
+    //{
+        int last_count = 0;
+        while (progress <= 1.0) {
             int barWidth = 70;
 
             std::cout << "[";
@@ -487,18 +510,25 @@ int main(int argc, char* argv[]) try
         // that should not be performed in the main loop
         
         //for (int k = 0; k < 2; k++)
-        for (int k = 0; k <= stoi(argv[9]); k++)
+        int k = 0;
+        //for (int k = 0; k <= stoi(argv[9]); k++)
+        while(k< stoi(argv[9]))
         {
-            data = pipe.wait_for_frames();
-            f += 1;
+            //data=pipe.wait_for_frames(data);
+            bFrame=pipe.try_wait_for_frames(&data);
+            curPos = playback.get_position();
+            if (curPos < lastPos)
+                break;
+            else
+            {
+                counter++;
+                lastPos = curPos;
+                k++;
+            }
         }
         
         //rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
-        if (argv[9] <= 0)
-        {
-            data = pipe.wait_for_frames();
-            f += 1;
-        }
+
         auto startTime_alignment_process = std::chrono::steady_clock::now();
         data_aligned_to_color = align_to_color.process(data);
         /*
@@ -561,12 +591,12 @@ int main(int argc, char* argv[]) try
         cv::Mat rgb_out = imageRGB.clone();
 
         // Update the window with new data
-        imshow(depth_frame, image);
+        bool bVis = stoi(argv[10]);
+
         //imshow(color_frame, imageRGB);
 
         float confThreshold = 0.2;//.9, 0.5
         float nmsThreshold = 0.4;//0.5
-        bool bVis = true;
         std::vector<BoundingBox> bBoxes;
         std::vector<BoundingBox> face_bBoxes;
 
@@ -575,9 +605,11 @@ int main(int argc, char* argv[]) try
         //compression_params.push_back(100);
 
         //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/"+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
-        imwrite(argv[4]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
+        //imwrite(argv[4]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
+        imwrite(argv[4] + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
-        detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
+        //detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
+        detectObjects(counter, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
             yoloBasePath, face_classes, yoloFaceModelConfiguration, yoloFaceModelWeights, bVis, 416);
         for (auto fbBox : face_bBoxes)
         {
@@ -594,7 +626,8 @@ int main(int argc, char* argv[]) try
 
         //detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
         //    yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
-        detectObjects(f, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
+        //detectObjects(f, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
+        detectObjects(counter, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
             yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 608);
 
 
@@ -978,9 +1011,18 @@ int main(int argc, char* argv[]) try
                                         //std::cout << "tl_depth: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << ", " << std::endl;
 
                                     }
-                                    cv::imshow("RGB_out", rgb_out);
+
+                                    if (bVis)
+                                    {
+                                        namedWindow(depth_frame, WINDOW_NORMAL);
+                                        cv::namedWindow("RGB_out", cv::WINDOW_NORMAL);
+                                        imshow(depth_frame, image);
+                                        cv::imshow("RGB_out", rgb_out);
+                                    }
+
                                     //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
-                                    imwrite(argv[6] + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                    //imwrite(argv[6] + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                    imwrite(argv[6] + zero_padding(std::to_string(counter), 5) + "_bkprj" + ".jpg", rgb_out);
 
                                     //}
                                     //if(render_box)
@@ -1217,10 +1259,25 @@ int main(int argc, char* argv[]) try
         std::cout << "Point cloud processing took " << elapsedTime.count() << " milliseconds" << std::endl;
         std::cout << "-----------------------------------------------------------------------" << std::endl;
 
-        progress += float(f) / (frame_count * 30); // for demonstration only
-        }
+        //progress += float(f) / (frame_count); // for demonstration only
+        progress += (float(counter)-float(last_count)) / frame_count; // for demonstration only
+        last_count = counter;
+        std::cout << "Counter: " << counter <<", Progress: "<<progress<<", Total frames: "<< frame_count << std::endl;
 
-    }
+        
+        if ((curPos < lastPos) || (not bFrame))
+        {
+            break;
+        }
+        
+        }
+        pipe.stop();
+
+    //}
+    std::cout << counter << " frames read." << std::endl;
+    //system("pause");
+    std::cout << "Paused. Press 'Enter' key to exit.";
+    std::cin.ignore();
 
     return EXIT_SUCCESS;
 }
