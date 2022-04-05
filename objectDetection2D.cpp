@@ -90,7 +90,7 @@ void draw_yolo_bb(cv::Mat& img, int c, float x, float y, float w, float h, vecto
 //void detectObjects(int f, cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThreshold, float nmsThreshold,
 //    std::string basePath, std::string classesFile, std::string modelConfiguration, std::string modelWeights, bool bVis)
 void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<BoundingBox>& bBoxes, float confThreshold, float nmsThreshold,
-    std::string basePath, vector<string> classes, std::string modelConfiguration, std::string modelWeights, bool bVis, int s)
+    std::string basePath, vector<string> classes, std::string modelConfiguration, std::string modelWeights, bool bVis, int s, bool save)
 {
     // load class names from file
     /*
@@ -239,7 +239,7 @@ void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<Bound
     }
 
     //imwrite(output_path + zero_padding(std::to_string(f), 5) + ".png", visImg);
-    if (bBoxes.size() > 0) imwrite(output_path + std::to_string(f) + ".jpg", visImg);
+    if (bBoxes.size() > 0 && save) imwrite(output_path + std::to_string(f) + ".jpg", visImg);
 
     // show results
     if (bVis)

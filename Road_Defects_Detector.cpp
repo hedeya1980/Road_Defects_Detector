@@ -58,6 +58,11 @@
 #include <filesystem>
 #include <pcl/kdtree/kdtree_flann.h>
 
+#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+// 3rd party header for writing png files
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 namespace fs = std::filesystem;
 
 // object detection
@@ -432,7 +437,7 @@ int main(int argc, char* argv[]) try
     std::cout << "File duration: " << duration.count() << std::endl;
     float duration_s = duration.count() / (1e9);
     float frame_count = duration_s * fps;
-    std::cout << "frames: " << frame_count << std::endl;
+    std::cout << "Estimated frame count: " << frame_count << std::endl;
 
     using namespace cv;
     const auto depth_frame = "Depth Image";
@@ -448,7 +453,7 @@ int main(int argc, char* argv[]) try
     CameraAngle setAngle = FPS; //XY, FPS, Side, TopDown
     initCamera(setAngle, viewer);
 
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> openCloud;
+    //boost::shared_ptr<pcl::visualization::PCLVisualizer> openCloud;
 
     //int f = 0;
     int first_f = 0;
@@ -458,13 +463,14 @@ int main(int argc, char* argv[]) try
     uint32_t counter = 0;
     uint64_t curPos;
     uint64_t lastPos = 0;
+    int saved_frames = 0;
     int k = 0;
     bool bFrame;
     //for (int i=0;i < stoi(argv[8]);i++)
     while(k< stoi(argv[8]))
     {
         //pipe.wait_for_frames();
-        pipe.try_wait_for_frames(&data);
+        bFrame = pipe.try_wait_for_frames(&data);
         curPos = playback.get_position();
         if (curPos < lastPos)
             break;
@@ -585,6 +591,9 @@ int main(int argc, char* argv[]) try
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
         Mat image(Size(w, h), CV_8UC3, (void*)depth2.get_data(), Mat::AUTO_STEP);
+        std::string png_file= argv[4] + zero_padding(std::to_string(counter), 5)+".png";
+        stbi_write_png(png_file.c_str(), depth2.as<rs2::video_frame>().get_width(), depth2.as<rs2::video_frame>().get_height(),
+            depth2.as<rs2::video_frame>().get_bytes_per_pixel(), depth2.as<rs2::video_frame>().get_data(), depth2.as<rs2::video_frame>().get_stride_in_bytes());
 
         Mat imageRGB(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB.get_data(), Mat::AUTO_STEP);
         Mat imageRGB_pc(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB_pc.get_data(), Mat::AUTO_STEP);
@@ -606,11 +615,11 @@ int main(int argc, char* argv[]) try
 
         //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/"+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
         //imwrite(argv[4]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
-        imwrite(argv[4] + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB);
+        //imwrite(argv[4] + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
         //detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
         detectObjects(counter, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
-            yoloBasePath, face_classes, yoloFaceModelConfiguration, yoloFaceModelWeights, bVis, 416);
+            yoloBasePath, face_classes, yoloFaceModelConfiguration, yoloFaceModelWeights, bVis, 416, true);
         for (auto fbBox : face_bBoxes)
         {
             Mat roi = imageRGB_pc(cv::Rect(std::max(fbBox.roi.x, 0), std::max(fbBox.roi.y, 0), std::min(fbBox.roi.width, w_rgb), std::min(fbBox.roi.height, h_rgb)));
@@ -624,11 +633,13 @@ int main(int argc, char* argv[]) try
                 }
         }
 
+        imwrite(argv[4] + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB_pc);
+
         //detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
         //    yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
         //detectObjects(f, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
         detectObjects(counter, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
-            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 608);
+            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 608, true);
 
 
         // Clear viewer
@@ -683,14 +694,15 @@ int main(int argc, char* argv[]) try
         viewer->removeAllShapes();
         // Load pcd and run obstacle detection process
         
-        renderPointCloud(viewer, cloud, "bagCloud");
+        if (stoi(argv[11])) renderPointCloud(viewer, cloud, "bagCloud");
         
         //renderPointCloud(viewer, newCloud, "bagCloud");
         viewer->spinOnce(); // Allow user to rotate point cloud and view it
         if (bBoxes.size() > 0)
         {
             ProcessPointClouds<Cloud_Type>* pointProcessorI = new ProcessPointClouds<Cloud_Type>();
-            //pointProcessorI->savePcd(cloud, argv[7] + zero_padding(std::to_string(f), 5) + "_original" + ".pcd");
+            pointProcessorI->savePcd(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + "_original" + ".pcd");
+            saved_frames++;
             for (auto bBox : bBoxes)
             {
                 auto startTime_bb_conversion_projection = std::chrono::steady_clock::now();
@@ -808,7 +820,6 @@ int main(int argc, char* argv[]) try
 
                     if (filterCloud->points.size() > 50)
                     {
-                        renderPointCloud(viewer, filterCloud, "filterCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(1, 0, 1));
                         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
                         std::pair<typename pcl::PointCloud<Cloud_Type>::Ptr, typename pcl::PointCloud<Cloud_Type>::Ptr> segmentCloud;
                         segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc / 300, coefficients); // Possible pavement defects //.01
@@ -817,8 +828,11 @@ int main(int argc, char* argv[]) try
                             << coefficients->values[1] << " "
                             << coefficients->values[2] << " "
                             << coefficients->values[3] << std::endl;
-
-                        renderPointCloud(viewer, segmentCloud.second, "planeCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 0));
+                        if (stoi(argv[11]))
+                        {
+                            renderPointCloud(viewer, filterCloud, "filterCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(1, 0, 1));
+                            renderPointCloud(viewer, segmentCloud.second, "planeCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 0));
+                        }
 
                         std::vector<pcl::PointCloud<Cloud_Type>::Ptr> cloudClusters;
                         if (segmentCloud.first->points.size() > 0)
@@ -911,21 +925,21 @@ int main(int argc, char* argv[]) try
                                                 for (Cloud_Type point : it->second)
                                                     min_depth_Cloud->points.push_back(point);
 
-                                                renderPointCloud(viewer, min_depth_Cloud, "minDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                                if(stoi(argv[11])) renderPointCloud(viewer, min_depth_Cloud, "minDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
                                             }
                                             else if ((it->first > 0 && it->first == rounded_max) || (it->first < 0 && it->first == rounded_min))
                                             {
                                                 for (Cloud_Type point : it->second)
                                                     max_depth_Cloud->points.push_back(point);
 
-                                                renderPointCloud(viewer, max_depth_Cloud, "maxDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                                if (stoi(argv[11])) renderPointCloud(viewer, max_depth_Cloud, "maxDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
                                             }
                                             else
                                             {
                                                 for (Cloud_Type point : it->second)
                                                     depth_contour_Cloud->points.push_back(point);
 
-                                                renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                                if (stoi(argv[11])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
                                                 /*
                                                 std::cout << "Contour size is: " << depth_contour_Cloud->points.size() << std::endl;
                                                 //std::cout << "Colors: " << get<0>(RGB_Color) <<", " << get<1>(RGB_Color) << ", " << get<2>(RGB_Color) << std::endl;
@@ -967,7 +981,7 @@ int main(int argc, char* argv[]) try
 
                                     std::cerr << "Concave hull has: " << cloud_hull->size()
                                         << " points." << std::endl;
-                                    renderPointCloud(viewer, cloud_hull, "cloud_hull" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1));
+                                    if (stoi(argv[11])) renderPointCloud(viewer, cloud_hull, "cloud_hull" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1));
                                     float concave_hull_area = calculatePolygonArea(*cloud_hull);
                                     std::cout << "Area within concave hull is: " << concave_hull_area << std::endl;
                                     float avg_area_per_point = concave_hull_area / cloud_projected->size();
@@ -1080,7 +1094,6 @@ int main(int argc, char* argv[]) try
                                     pca_end_points_z->points.push_back(minPoint_z);
                                     pca_end_points_z->points.push_back(maxPoint_z);
                                     pcl::transformPointCloud(*pca_end_points_z, *pca_end_points_z_out, bboxTransform, bboxQuaternion);
-                                    renderPointCloud(viewer, pca_end_points_z_out, "pca_end_points_z" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 10);
                                     float distance_z = pcl::euclideanDistance(pca_end_points_z_out->points[0], pca_end_points_z_out->points[1]);
                                     std::cout << "Blue Diameter (z) equals: " << distance_z << " m." << std::endl;
 
@@ -1107,7 +1120,6 @@ int main(int argc, char* argv[]) try
                                     pca_end_points_y->points.push_back(minPoint_y);
                                     pca_end_points_y->points.push_back(maxPoint_y);
                                     pcl::transformPointCloud(*pca_end_points_y, *pca_end_points_y_out, bboxTransform, bboxQuaternion);
-                                    renderPointCloud(viewer, pca_end_points_y_out, "pca_end_points_y" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 0, 0), 10);
                                     float distance_y = pcl::euclideanDistance(pca_end_points_y_out->points[0], pca_end_points_y_out->points[1]);
                                     std::cout << "Red Diameter (y) equals: " << distance_y << " m." << std::endl;
 
@@ -1121,7 +1133,6 @@ int main(int argc, char* argv[]) try
                                     pca_end_points_x->points.push_back(minPoint_x);
                                     pca_end_points_x->points.push_back(maxPoint_x);
                                     pcl::transformPointCloud(*pca_end_points_x, *pca_end_points_x_out, bboxTransform, bboxQuaternion);
-                                    //renderPointCloud(viewer, pca_end_points_x_out, "pca_end_points_x" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 1, 1), 10);
                                     float distance_x = pcl::euclideanDistance(pca_end_points_x_out->points[0], pca_end_points_x_out->points[1]);
                                     std::cout << "White Diameter (x) equals: " << distance_x << " m." << std::endl;
 
@@ -1142,10 +1153,17 @@ int main(int argc, char* argv[]) try
                                             cluster_pts_prmry_pca_axis_2->points.push_back(p);
                                         }
                                     }
-                                    renderPointCloud(viewer, cluster_pts_prmry_pca_axis_1, "cluster_pts_prmry_pca_axis_1" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
                                     std::cout << "cluster_pts_prmry_pca_axis_1: " << cluster_pts_prmry_pca_axis_1->points.size() << "." << std::endl;
-                                    renderPointCloud(viewer, cluster_pts_prmry_pca_axis_2, "cluster_pts_prmry_pca_axis_2" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
                                     std::cout << "cluster_pts_prmry_pca_axis_2: " << cluster_pts_prmry_pca_axis_2->points.size() << "." << std::endl;
+
+                                    if (stoi(argv[11]))
+                                    {
+                                        renderPointCloud(viewer, pca_end_points_z_out, "pca_end_points_z" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 10);
+                                        renderPointCloud(viewer, pca_end_points_y_out, "pca_end_points_y" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 0, 0), 10);
+                                        //renderPointCloud(viewer, pca_end_points_x_out, "pca_end_points_x" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 1, 1), 10);
+                                        renderPointCloud(viewer, cluster_pts_prmry_pca_axis_1, "cluster_pts_prmry_pca_axis_1" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
+                                        renderPointCloud(viewer, cluster_pts_prmry_pca_axis_2, "cluster_pts_prmry_pca_axis_2" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
+                                    }
 
 
                                     if (classes[bBox.classID] == "Potholes" && rounded_min < 0)
@@ -1262,7 +1280,7 @@ int main(int argc, char* argv[]) try
         //progress += float(f) / (frame_count); // for demonstration only
         progress += (float(counter)-float(last_count)) / frame_count; // for demonstration only
         last_count = counter;
-        std::cout << "Counter: " << counter <<", Progress: "<<progress<<", Total frames: "<< frame_count << std::endl;
+        std::cout << "Counter: " << counter << ", Total frames (est.): "<< frame_count << std::endl;
 
         
         if ((curPos < lastPos) || (not bFrame))
@@ -1274,7 +1292,7 @@ int main(int argc, char* argv[]) try
         pipe.stop();
 
     //}
-    std::cout << counter << " frames read." << std::endl;
+    std::cout << counter << " frames read, " <<saved_frames << " frames saved." << std::endl;
     //system("pause");
     std::cout << "Paused. Press 'Enter' key to exit.";
     std::cin.ignore();
