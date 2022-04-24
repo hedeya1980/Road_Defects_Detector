@@ -63,6 +63,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#include <C:/Program Files (x86)/jsoncpp/include/json/writer.h>
+
 namespace fs = std::filesystem;
 
 // object detection
@@ -119,6 +121,48 @@ to_chrono_time_point(double d)
     return sys_days{ December / 30 / 1899 } + round<system_clock::duration>(ddays{ d });
 }
 */
+
+void metadata_to_csv(const rs2::frame& frm, const std::string& filename)
+{
+    std::ofstream csv;
+
+    csv.open(filename);
+
+    //    std::cout << "Writing metadata to " << filename << endl;
+    csv << "Stream," << rs2_stream_to_string(frm.get_profile().stream_type()) << "\nMetadata Attribute,Value\n";
+
+    // Record all the available metadata attributes
+    for (size_t i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
+    {
+        if (frm.supports_frame_metadata((rs2_frame_metadata_value)i))
+        {
+            csv << rs2_frame_metadata_to_string((rs2_frame_metadata_value)i) << ","
+                << frm.get_frame_metadata((rs2_frame_metadata_value)i) << "\n";
+        }
+    }
+
+    csv.close();
+}
+
+void metadata_to_jsn(int counter, Json::Value &event, const rs2::frame& frm)
+{
+    //Json::Value vec(Json::arrayValue);
+    //vec.append(Json::Value(1));
+    //vec.append(Json::Value(2));
+    //vec.append(Json::Value(3));
+    std::string streamType = rs2_stream_to_string(frm.get_profile().stream_type());
+
+    // Record all the available metadata attributes
+    for (size_t i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
+    {
+        if (frm.supports_frame_metadata((rs2_frame_metadata_value)i))
+        {
+            event[to_string(counter)][streamType][rs2_frame_metadata_to_string((rs2_frame_metadata_value)i)] = frm.get_frame_metadata((rs2_frame_metadata_value)i);
+        }
+    }
+}
+
+
 
 template<typename PointT>
 float average_distance(typename pcl::PointCloud<PointT>::Ptr inputCloud)
@@ -466,6 +510,7 @@ int main(int argc, char* argv[]) try
     int saved_frames = 0;
     int k = 0;
     bool bFrame;
+    Json::Value event;
     //for (int i=0;i < stoi(argv[8]);i++)
     while(k< stoi(argv[8]))
     {
@@ -516,9 +561,9 @@ int main(int argc, char* argv[]) try
         // that should not be performed in the main loop
         
         //for (int k = 0; k < 2; k++)
-        int k = 0;
-        //for (int k = 0; k <= stoi(argv[9]); k++)
-        while(k< stoi(argv[9]))
+        //int k = 0;
+        //while (k < stoi(argv[9]))
+        for (int k = 0; k <= stoi(argv[9]); k++)
         {
             //data=pipe.wait_for_frames(data);
             bFrame=pipe.try_wait_for_frames(&data);
@@ -529,7 +574,7 @@ int main(int argc, char* argv[]) try
             {
                 counter++;
                 lastPos = curPos;
-                k++;
+                //k++;
             }
         }
         
@@ -594,6 +639,15 @@ int main(int argc, char* argv[]) try
         std::string png_file= argv[4] + zero_padding(std::to_string(counter), 5)+".png";
         stbi_write_png(png_file.c_str(), depth2.as<rs2::video_frame>().get_width(), depth2.as<rs2::video_frame>().get_height(),
             depth2.as<rs2::video_frame>().get_bytes_per_pixel(), depth2.as<rs2::video_frame>().get_data(), depth2.as<rs2::video_frame>().get_stride_in_bytes());
+
+        // Record per-frame metadata for UVC streams
+        std::stringstream csv_file;
+        csv_file << "rs-save-to-disk-output-" << RGB_pc.as<rs2::video_frame>().get_profile().stream_name()
+            << "-metadata.csv";
+        metadata_to_csv(RGB_pc.as<rs2::video_frame>(), csv_file.str());
+
+        metadata_to_jsn(counter, event, RGB_pc.as<rs2::video_frame>());
+        metadata_to_jsn(counter, event, depth2.as<rs2::video_frame>());
 
         Mat imageRGB(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB.get_data(), Mat::AUTO_STEP);
         Mat imageRGB_pc(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB_pc.get_data(), Mat::AUTO_STEP);
@@ -823,6 +877,7 @@ int main(int argc, char* argv[]) try
                         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
                         std::pair<typename pcl::PointCloud<Cloud_Type>::Ptr, typename pcl::PointCloud<Cloud_Type>::Ptr> segmentCloud;
                         segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc / 300, coefficients); // Possible pavement defects //.01
+                        //segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 5000, 0.01, coefficients); // Possible pavement defects //.01
 
                         std::cerr << "Model coefficients: " << coefficients->values[0] << " "
                             << coefficients->values[1] << " "
@@ -840,6 +895,7 @@ int main(int argc, char* argv[]) try
                             if (classes[bBox.classID] == "Potholes")
                             {
                                 cloudClusters = pointProcessorI->Clustering(segmentCloud.first, 0.01 * pixel_distance_in_meters_cc, 500, 50000);
+                                //cloudClusters = pointProcessorI->Clustering(segmentCloud.first, 0.02, 1000, 50000);
                                 int clusterId = 0;
 
                                 int i = 0;
@@ -1171,7 +1227,7 @@ int main(int argc, char* argv[]) try
                                         std::cout << "**************************************" << std::endl;
                                         std::cout << "Pothole attributes:" << std::endl;
                                         std::cout << "-------------------" << std::endl;
-                                        //std::cout << "Distance to center of Bbox is: " << pixel_distance_in_meters_cc << " m." << std::endl;
+                                        std::cout << "Distance to center of Bbox is: " << pixel_distance_in_meters_cc << " m." << std::endl;
                                         std::cout << "Maximum Pothole's Depth is: " << abs(rounded_min) << " mm." << std::endl;
                                         float avg_diameter_mm = abs(floor(0.5 * (distance_z + distance_y) * 1000.0 + .5));
                                         std::cout << "Average Pothole's Diameter is: " << avg_diameter_mm << " mm." << std::endl;
@@ -1293,6 +1349,14 @@ int main(int argc, char* argv[]) try
 
     //}
     std::cout << counter << " frames read, " <<saved_frames << " frames saved." << std::endl;
+    Json::StreamWriterBuilder builder;
+    builder["commentStyle"] = "None";
+    builder["indentation"] = "   ";
+
+    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    std::ofstream outputFileStream("log.json");
+    writer->write(event, &outputFileStream);
+
     //system("pause");
     std::cout << "Paused. Press 'Enter' key to exit.";
     std::cin.ignore();
