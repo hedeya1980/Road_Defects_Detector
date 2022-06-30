@@ -36,8 +36,11 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/console/parse.h>
 #include <boost/thread/thread.hpp>
-#include <pcl/io/io.h>
 */
+#include <pcl/io/pcd_io.h>
+
+#include <pcl/io/io.h>
+
 #include <typeinfo>
 #include <pcl/filters/passthrough.h>
 #include <pcl/sample_consensus/sac_model_plane.h>
@@ -47,9 +50,6 @@
 #include "processPointClouds.cpp"
 #include "objectDetection2D.cpp"
 #include "dataStructures.h"
-
-#include <pcl/filters/project_inliers.h>
-#include <pcl/surface/concave_hull.h>
 
 #include <pcl/common/pca.h>
 #include <pcl/common/transforms.h>
@@ -419,7 +419,8 @@ int main(int argc, char* argv[]) try
     
     string yoloBasePath = argv[2];
     string yoloClassesFile = yoloBasePath + "Proj_obj-13.names";
-    string yoloModelConfiguration = yoloBasePath + "yolov3_proj.cfg";
+    //string yoloModelConfiguration = yoloBasePath + "yolov3_proj.cfg";
+    string yoloModelConfiguration = yoloBasePath + "yolov3_5l_proj.cfg";
     string yoloModelWeights = yoloBasePath + argv[3];
     string yoloFaceModelWeights = yoloBasePath + "yolov3-wider_16000.weights";
 
@@ -720,9 +721,15 @@ int main(int argc, char* argv[]) try
         /*
         pcl::PassThrough<Cloud_Type> Cloud_Filter; // Create the filtering object
         Cloud_Filter.setInputCloud(cloud);           // Input generated cloud to filter
+        Cloud_Filter.setFilterFieldName("x");        // Set field name to X-coordinate
+        Cloud_Filter.setFilterLimits(-6.0, 6.0);      // Set accepted interval values
+        Cloud_Filter.filter(*cloud);              // Filtered Cloud Outputted
+        Cloud_Filter.setFilterFieldName("y");        // Set field name to Y-coordinate
+        Cloud_Filter.setFilterLimits(-6.0, 6.0);      // Set accepted interval values
+        Cloud_Filter.filter(*cloud);              // Filtered Cloud Outputted
         Cloud_Filter.setFilterFieldName("z");        // Set field name to Z-coordinate
-        Cloud_Filter.setFilterLimits(0.0, 1.0);      // Set accepted interval values
-        Cloud_Filter.filter(*newCloud);              // Filtered Cloud Outputted
+        Cloud_Filter.setFilterLimits(0.0, 6.0);      // Set accepted interval values
+        Cloud_Filter.filter(*cloud);              // Filtered Cloud Outputted
         */
         if (first_f == 0)
         {
@@ -755,7 +762,11 @@ int main(int argc, char* argv[]) try
         if (bBoxes.size() > 0)
         {
             ProcessPointClouds<Cloud_Type>* pointProcessorI = new ProcessPointClouds<Cloud_Type>();
-            pointProcessorI->savePcd(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + "_original" + ".pcd");
+            //pointProcessorI->savePcd(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + ".pcd");
+            //pointProcessorI->saveBin(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + ".pcd");//bin
+            pcl::io::savePCDFileBinaryCompressed(argv[7] + zero_padding(std::to_string(counter), 5) +"_compressed_" + ".pcd", *cloud);
+            //pcl::io::savePLYFile(argv[7] + zero_padding(std::to_string(counter), 5) + ".ply", *cloud);
+            //pointProcessorI->saveBin(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + ".ply");//bin
             saved_frames++;
             for (auto bBox : bBoxes)
             {
@@ -876,7 +887,7 @@ int main(int argc, char* argv[]) try
                     {
                         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
                         std::pair<typename pcl::PointCloud<Cloud_Type>::Ptr, typename pcl::PointCloud<Cloud_Type>::Ptr> segmentCloud;
-                        segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc / 300, coefficients); // Possible pavement defects //.01
+                        segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc / 250, coefficients); // Possible pavement defects //.01//300
                         //segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 5000, 0.01, coefficients); // Possible pavement defects //.01
 
                         std::cerr << "Model coefficients: " << coefficients->values[0] << " "
@@ -916,6 +927,9 @@ int main(int argc, char* argv[]) try
                                     std::cout << "--------------------------------------" << std::endl;
                                     std::cout << "cluster size ";
                                     pointProcessorI->numPoints(cluster);
+
+                                    cCluster cc;
+                                    cc.clusterID = clusterId;
 
                                     double min_depth = 10000;
                                     double max_depth = -10000;
@@ -960,10 +974,12 @@ int main(int argc, char* argv[]) try
                                     pcl::PointCloud<Cloud_Type>::Ptr max_depth_Cloud(new pcl::PointCloud<Cloud_Type>);
                                     int rounded_max = floor(max_depth * 1000.0 + .5);
                                     int rounded_min = floor(min_depth * 1000.0 + .5);
+                                    cc.minDepth = rounded_min;
+                                    cc.maxDepth = rounded_max;
                                     int max_level = 150;
                                     int min_level = -110;
                                     int j = 0;
-                                    std::vector<int> depths;
+               
                                     //int capacity = 0;
                                     int pos_capacity = 0;
                                     int neg_capacity = 0;
@@ -976,35 +992,29 @@ int main(int argc, char* argv[]) try
                                             //std::cout << int(it->first) << std::endl;
                                             RGB_Color = RGB_Heatmap(min_level, max_level, int(it->first));
                                             //if ((it->first > 0 && it->first == rounded_min) || (it->first < 0 && it->first == rounded_max))
-                                            if ((it->first > 0 && it->first == rounded_min) || (it->first < 0 && it->first == rounded_max))
+                                            for (Cloud_Type point : it->second)
                                             {
-                                                for (Cloud_Type point : it->second)
+                                                LidarPoint p;
+                                                p.x = point.x, p.y = point.y, p.z = point.z;
+                                                p.r = get<0>(RGB_Color) * 255.0, p.g = get<1>(RGB_Color) * 255.0, p.b = get<2>(RGB_Color) * 255.0;
+                                                cc.lidarPoints.push_back(p);
+                                                if ((it->first > 0 && it->first == rounded_min) || (it->first < 0 && it->first == rounded_max))
                                                     min_depth_Cloud->points.push_back(point);
-
-                                                if(stoi(argv[11])) renderPointCloud(viewer, min_depth_Cloud, "minDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
-                                            }
-                                            else if ((it->first > 0 && it->first == rounded_max) || (it->first < 0 && it->first == rounded_min))
-                                            {
-                                                for (Cloud_Type point : it->second)
+                                                else if ((it->first > 0 && it->first == rounded_max) || (it->first < 0 && it->first == rounded_min))
                                                     max_depth_Cloud->points.push_back(point);
-
-                                                if (stoi(argv[11])) renderPointCloud(viewer, max_depth_Cloud, "maxDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
-                                            }
-                                            else
-                                            {
-                                                for (Cloud_Type point : it->second)
+                                                else
                                                     depth_contour_Cloud->points.push_back(point);
+                                            }
 
-                                                if (stoi(argv[11])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                                //if (stoi(argv[11])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
                                                 /*
                                                 std::cout << "Contour size is: " << depth_contour_Cloud->points.size() << std::endl;
                                                 //std::cout << "Colors: " << get<0>(RGB_Color) <<", " << get<1>(RGB_Color) << ", " << get<2>(RGB_Color) << std::endl;
                                                 cout << endl;
                                                 cout << "Press [Q] in viewer to continue. " << endl;
                                                 */
-                                            }
-                                            depths.push_back(it->first);
-                                            //if (min_depth < 0 && max_depth < 0)
+
+                                                //if (min_depth < 0 && max_depth < 0)
                                             if (it->first > 0)
                                                 pos_capacity += (it->first) * depth_estimation[it->first].size();
                                             else if (it->first < 0)
@@ -1012,29 +1022,32 @@ int main(int argc, char* argv[]) try
                                         }
                                         j++;
                                     }
+                                    pcl::PointCloud<Cloud_Type>::Ptr depth_colored_Cloud(new pcl::PointCloud<Cloud_Type>);
+                                    for (auto p : cc.lidarPoints)
+                                    {
+                                        Cloud_Type point;
+                                        point.x = p.x, point.y = p.y, point.z = p.z;
+                                        point.r = p.r, point.g = p.g, point.b = p.b;
+                                        depth_colored_Cloud->points.push_back(point);
+                                    }
+                                    renderPointCloud(viewer, depth_colored_Cloud, "coloredDepth" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4));
                                     //std::cout << "Pothole's total capacity in mm is: " << capacity <<"." << std::endl;
                                     std::cout << "Defect's total positive capacity in mm is: " << pos_capacity << "." << std::endl;
                                     std::cout << "Defect's total negative capacity in mm is: " << neg_capacity << "." << std::endl;
 
-
                                     pcl::PointCloud<Cloud_Type>::Ptr cloud_projected(new pcl::PointCloud<Cloud_Type>);
-                                    // Project the model inliers
-                                    pcl::ProjectInliers<Cloud_Type> proj;
-                                    proj.setModelType(pcl::SACMODEL_PLANE);
-                                    // proj.setIndices (inliers);
-                                    proj.setInputCloud(cluster);
-                                    proj.setModelCoefficients(coefficients);
-                                    proj.filter(*cloud_projected);
-                                    std::cerr << "Projected cluster has: "
-                                        << cloud_projected->size() << " points." << std::endl;
+                                    cloud_projected = pointProcessorI->ProjectCloud(cluster, coefficients);
+                                    std::cerr << "Projected cluster has: " << cloud_projected->size() << " points." << std::endl;
 
                                     // Create a Concave Hull representation of the projected inliers
                                     pcl::PointCloud<Cloud_Type>::Ptr cloud_hull(new pcl::PointCloud<Cloud_Type>);
+                                    pointProcessorI->ConcaveHullCloud(cloud_projected, cloud_hull);
+                                    /*
                                     pcl::ConcaveHull<Cloud_Type> chull;
                                     chull.setInputCloud(cloud_projected);
                                     chull.setAlpha(0.1);
                                     chull.reconstruct(*cloud_hull);
-
+                                    */
                                     std::cerr << "Concave hull has: " << cloud_hull->size()
                                         << " points." << std::endl;
                                     if (stoi(argv[11])) renderPointCloud(viewer, cloud_hull, "cloud_hull" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1));
@@ -1100,6 +1113,9 @@ int main(int argc, char* argv[]) try
                                     //Box box = pointProcessor.BoundingBox(cluster);
                                     //renderBox(viewer, box, clusterId);
                                     //}
+                                    
+                                    cc.box = pointProcessorI->BoundingBoxQ(cluster);
+                                    renderBox(viewer, cc.box, stoi(std::to_string(bBox.boxID)+std::to_string(cc.clusterID)));//std::to_string(bBox.boxID)
                                     // Compute principal directions
                                     Eigen::Vector4f pcaCentroid;
                                     //pcl::compute3DCentroid(*cloud_projected, pcaCentroid);
@@ -1111,15 +1127,6 @@ int main(int argc, char* argv[]) try
                                     Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
                                     eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
                                                                                                                     ///    the signs are different and the box doesn't get correctly oriented in some cases.
-                                    /* // Note that getting the eigenvectors can also be obtained via the PCL PCA interface with something like:
-                                    pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCAprojection (new pcl::PointCloud<pcl::PointXYZ>);
-                                    pcl::PCA<pcl::PointXYZ> pca;
-                                    pca.setInputCloud(cloudSegmented);
-                                    pca.project(*cloudSegmented, *cloudPCAprojection);
-                                    std::cerr << std::endl << "EigenVectors: " << pca.getEigenVectors() << std::endl;
-                                    std::cerr << std::endl << "EigenValues: " << pca.getEigenValues() << std::endl;
-                                    // In this case, pca.getEigenVectors() gives similar eigenVectors to eigenVectorsPCA.
-                                    */
                                     // Transform the original cloud to the origin where the principal components correspond to the axes.
                                     Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
                                     projectionTransform.block<3, 3>(0, 0) = eigenVectorsPCA.transpose();
@@ -1135,6 +1142,14 @@ int main(int argc, char* argv[]) try
                                     // Final transform
                                     const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
                                     const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+
+                                    
+                                    
+
+                                    //PCABox<Cloud_Type>(cluster, eigenVectorsPCA, bboxTransform);
+                                    //const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
+
+
                                     Eigen::Vector3f x_axis = eigenVectorsPCA.col(0);
                                     //std::cout << x_axis[0] << ", " << x_axis[1] << ", " << x_axis[2] << std::endl;
                                     Eigen::Vector3f y_axis = eigenVectorsPCA.col(1);
@@ -1143,10 +1158,10 @@ int main(int argc, char* argv[]) try
                                     Cloud_Type minPoint_z, maxPoint_z;
                                     pcl::PointCloud<Cloud_Type>::Ptr pca_end_points_z(new pcl::PointCloud<Cloud_Type>);
                                     pcl::PointCloud<Cloud_Type>::Ptr pca_end_points_z_out(new pcl::PointCloud<Cloud_Type>);
-                                    //minPoint_z.x = 0.0, minPoint_z.y = 0.0, minPoint_z.z = minPoint.z;
-                                    minPoint_z.x = maxPoint.x, minPoint_z.y = 0.0, minPoint_z.z = minPoint.z;
-                                    //maxPoint_z.x = 0.0, maxPoint_z.y = 0.0, maxPoint_z.z = maxPoint.z;
-                                    maxPoint_z.x = maxPoint.x, maxPoint_z.y = 0.0, maxPoint_z.z = maxPoint.z;
+                                    minPoint_z.x = cc.box.x_max, minPoint_z.y = 0.0, minPoint_z.z = cc.box.z_min;
+                                    maxPoint_z.x = cc.box.x_max, maxPoint_z.y = 0.0, maxPoint_z.z = cc.box.z_max;
+                                    //minPoint_z.x = maxPoint.x, minPoint_z.y = 0.0, minPoint_z.z = minPoint.z;
+                                    //maxPoint_z.x = maxPoint.x, maxPoint_z.y = 0.0, maxPoint_z.z = maxPoint.z;
                                     pca_end_points_z->points.push_back(minPoint_z);
                                     pca_end_points_z->points.push_back(maxPoint_z);
                                     pcl::transformPointCloud(*pca_end_points_z, *pca_end_points_z_out, bboxTransform, bboxQuaternion);
@@ -1308,6 +1323,7 @@ int main(int argc, char* argv[]) try
                                         std::cout << "Pothole's volume (under plane only) is: " << abs(neg_volume) << " m3 (" << 1000 * abs(neg_volume) << " litres)." << std::endl;
                                         std::cout << "**************************************" << std::endl;
                                     }
+                                    bBox.cClusters.push_back(cc);
                                     ++clusterId;
                                     viewer->spinOnce(); // Allow user to rotate point cloud and view it
 

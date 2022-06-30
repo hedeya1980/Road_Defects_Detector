@@ -22,6 +22,30 @@ void ProcessPointClouds<PointT>::numPoints(typename pcl::PointCloud<PointT>::Ptr
     std::cout << cloud->points.size() << std::endl;
 }
 
+template<typename PointT>
+typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::ProjectCloud(typename pcl::PointCloud<PointT>::Ptr cloud, pcl::ModelCoefficients::Ptr coefficients)
+{
+    typename pcl::PointCloud<PointT>::Ptr projected_cloud(new pcl::PointCloud<PointT>());
+    // Project the model inliers
+    pcl::ProjectInliers<PointT> proj;
+    proj.setModelType(pcl::SACMODEL_PLANE);
+    // proj.setIndices (inliers);
+    proj.setInputCloud(cloud);
+    proj.setModelCoefficients(coefficients);
+    proj.filter(*projected_cloud);
+
+    return projected_cloud;
+}
+
+template<typename PointT>
+void ProcessPointClouds<PointT>::ConcaveHullCloud(typename pcl::PointCloud<PointT>::Ptr cloud, typename pcl::PointCloud<PointT>::Ptr cloud_hull)
+{
+    pcl::ConcaveHull<PointT> chull;
+    chull.setInputCloud(cloud);
+    chull.setAlpha(0.1);
+    chull.reconstruct(*cloud_hull);
+}
+
 
 template<typename PointT>
 typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::FilterCloud(typename pcl::PointCloud<PointT>::Ptr cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint)
@@ -385,12 +409,69 @@ Box ProcessPointClouds<PointT>::BoundingBox(typename pcl::PointCloud<PointT>::Pt
     return box;
 }
 
+template<typename PointT>
+BoxQ ProcessPointClouds<PointT>::BoundingBoxQ(typename pcl::PointCloud<PointT>::Ptr cluster)
+{
+    BoxQ box;
+    // Compute principal directions
+    Eigen::Vector4f pcaCentroid;
+    //pcl::compute3DCentroid(*cloud_projected, pcaCentroid);
+    pcl::compute3DCentroid(*cluster, pcaCentroid);
+    Eigen::Matrix3f covariance;
+    //computeCovarianceMatrixNormalized(*cloud_projected, pcaCentroid, covariance);
+    computeCovarianceMatrixNormalized(*cluster, pcaCentroid, covariance);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+    Eigen::Matrix3f eigenVectorsPCA = eigen_solver.eigenvectors();
+    eigenVectorsPCA.col(2) = eigenVectorsPCA.col(0).cross(eigenVectorsPCA.col(1));  /// This line is necessary for proper orientation in some cases. The numbers come out the same without it, but
+                                                                                    ///    the signs are different and the box doesn't get correctly oriented in some cases.
+    /* // Note that getting the eigenvectors can also be obtained via the PCL PCA interface with something like:
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCAprojection (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PCA<pcl::PointXYZ> pca;
+    pca.setInputCloud(cloudSegmented);
+    pca.project(*cloudSegmented, *cloudPCAprojection);
+    std::cerr << std::endl << "EigenVectors: " << pca.getEigenVectors() << std::endl;
+    std::cerr << std::endl << "EigenValues: " << pca.getEigenValues() << std::endl;
+    // In this case, pca.getEigenVectors() gives similar eigenVectors to eigenVectorsPCA.
+    */
+    // Transform the original cloud to the origin where the principal components correspond to the axes.
+    Eigen::Matrix4f projectionTransform(Eigen::Matrix4f::Identity());
+    projectionTransform.block<3, 3>(0, 0) = eigenVectorsPCA.transpose();
+    projectionTransform.block<3, 1>(0, 3) = -1.f * (projectionTransform.block<3, 3>(0, 0) * pcaCentroid.head<3>());
+    typename pcl::PointCloud<PointT>::Ptr cloudPointsProjected(new pcl::PointCloud<PointT>);
+    //pcl::transformPointCloud(*cloud_projected, *cloudPointsProjected, projectionTransform);
+    pcl::transformPointCloud(*cluster, *cloudPointsProjected, projectionTransform);
+    // Get the minimum and maximum points of the transformed cloud.
+    PointT minPoint, maxPoint;
+    pcl::getMinMax3D(*cloudPointsProjected, minPoint, maxPoint);
+    const Eigen::Vector3f meanDiagonal = 0.5f * (maxPoint.getVector3fMap() + minPoint.getVector3fMap());
+
+    // Final transform
+    const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
+    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+    
+    box.bboxQuaternion = bboxQuaternion;
+    box.bboxTransform = bboxTransform;
+    box.x_min = minPoint.x, box.y_min = minPoint.y, box.z_min = minPoint.z;
+    box.x_max = maxPoint.x, box.y_max = maxPoint.y, box.z_max = maxPoint.z;
+    box.cube_length = std::abs(maxPoint.x - minPoint.x);
+    box.cube_width = std::abs(maxPoint.y - minPoint.y);
+    box.cube_height = std::abs(maxPoint.z - minPoint.z);
+    return box;
+}
+
 
 template<typename PointT>
 void ProcessPointClouds<PointT>::savePcd(typename pcl::PointCloud<PointT>::Ptr cloud, std::string file)
 {
     pcl::io::savePCDFileASCII (file, *cloud);
     std::cerr << "Saved " << cloud->points.size () << " data points to "+file << std::endl;
+}
+
+template<typename PointT>
+void ProcessPointClouds<PointT>::saveBin(typename pcl::PointCloud<PointT>::Ptr cloud, std::string file)
+{
+    pcl::io::save(file, *cloud);
+    std::cerr << "Saved " << cloud->points.size() << " data points to " + file << std::endl;
 }
 
 

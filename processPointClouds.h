@@ -19,6 +19,16 @@
 #include <chrono>
 #include "box.h"
 
+#include <pcl/filters/project_inliers.h>
+#include <pcl/surface/concave_hull.h>
+#include <pcl/io/auto_io.h>
+
+#include <Eigen/Geometry> 
+#include <pcl/common/pca.h>
+#include <pcl/common/transforms.h>
+#include <pcl/common/distances.h>
+
+
 
 template<typename PointT>
 class ProcessPointClouds {
@@ -33,6 +43,10 @@ public:
 
     typename pcl::PointCloud<PointT>::Ptr FilterCloud(typename pcl::PointCloud<PointT>::Ptr cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint);
 
+    typename pcl::PointCloud<PointT>::Ptr ProjectCloud(typename pcl::PointCloud<PointT>::Ptr cloud, pcl::ModelCoefficients::Ptr coefficients);
+
+    void ConcaveHullCloud(typename pcl::PointCloud<PointT>::Ptr cloud, typename pcl::PointCloud<PointT>::Ptr cloud_hull);
+
     std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> RansacPlane(typename pcl::PointCloud<PointT>::Ptr cloud, int maxIterations, float distanceTol);
 
     std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SeparateClouds(pcl::PointIndices::Ptr inliers, typename pcl::PointCloud<PointT>::Ptr cloud);
@@ -41,9 +55,13 @@ public:
     std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SegmentCircle2D(typename pcl::PointCloud<PointT>::Ptr cloud, int maxIterations, float distanceThreshold, pcl::ModelCoefficients::Ptr coefficients);
     std::vector<typename pcl::PointCloud<PointT>::Ptr> Clustering(typename pcl::PointCloud<PointT>::Ptr cloud, float clusterTolerance, int minSize, int maxSize);
 
+    BoxQ BoundingBoxQ(typename pcl::PointCloud<PointT>::Ptr cluster);
+
     Box BoundingBox(typename pcl::PointCloud<PointT>::Ptr cluster);
 
     void savePcd(typename pcl::PointCloud<PointT>::Ptr cloud, std::string file);
+
+    void saveBin(typename pcl::PointCloud<PointT>::Ptr cloud, std::string file);
 
     typename pcl::PointCloud<PointT>::Ptr loadPcd(std::string file);
 
