@@ -417,16 +417,21 @@ void fit_plane(PointT p1, PointT p2, PointT p3, float& a, float& b, float& c, fl
 int main(int argc, char* argv[]) try
 {
     
-    string yoloBasePath = argv[2];
+    string yoloBasePath = argv[3];
     string yoloClassesFile = yoloBasePath + "Proj_obj-13.names";
     //string yoloModelConfiguration = yoloBasePath + "yolov3_proj.cfg";
-    string yoloModelConfiguration = yoloBasePath + "yolov3_5l_proj.cfg";
-    string yoloModelWeights = yoloBasePath + argv[3];
+    string yoloModelConfiguration = yoloBasePath + argv[4];
+    string yoloModelWeights = yoloBasePath + argv[5];
     string yoloFaceModelWeights = yoloBasePath + "yolov3-wider_16000.weights";
 
     string yoloFaceClassesFile = yoloBasePath + "face.names";
     string yoloFaceModelConfiguration = yoloBasePath + "yolov3-face.cfg";
 
+    fs::create_directory(argv[6]);
+    fs::create_directory(string(argv[6]) + string(argv[7]));
+    fs::create_directory(string(argv[6]) + string(argv[8]));
+    fs::create_directory(string(argv[6]) + string(argv[9]));
+    fs::create_directory(string(argv[6]) + string(argv[10]));
 
     // load class names from file
     vector<string> classes;
@@ -449,8 +454,8 @@ int main(int argc, char* argv[]) try
     //pipe.start();
     rs2::config cfg;
     //cfg.enable_device_from_file(bag_path);
-    cfg.enable_device_from_file(argv[1], false);
-    //cfg.enable_device_from_file(argv[1]);
+    cfg.enable_device_from_file(string(argv[1])+ string(argv[2]), false);
+    //cfg.enable_device_from_file(string(argv[1])+ string(argv[2]));
 
     //pipe.start(cfg); // Load from file
     rs2::pipeline_profile profile = pipe.start(cfg);
@@ -512,8 +517,8 @@ int main(int argc, char* argv[]) try
     int k = 0;
     bool bFrame;
     Json::Value event;
-    //for (int i=0;i < stoi(argv[8]);i++)
-    while(k< stoi(argv[8]))
+    //for (int i=0;i < stoi(argv[11]);i++)
+    while(k< stoi(argv[11]))
     {
         //pipe.wait_for_frames();
         bFrame = pipe.try_wait_for_frames(&data);
@@ -529,7 +534,7 @@ int main(int argc, char* argv[]) try
         }
     }
     /*
-    for (int k = 0; k <= stoi(argv[8]); k++)
+    for (int k = 0; k <= stoi(argv[11]); k++)
     {
         data = pipe.wait_for_frames();
         f += 1;
@@ -563,8 +568,8 @@ int main(int argc, char* argv[]) try
         
         //for (int k = 0; k < 2; k++)
         //int k = 0;
-        //while (k < stoi(argv[9]))
-        for (int k = 0; k <= stoi(argv[9]); k++)
+        //while (k < stoi(argv[12]))
+        for (int k = 0; k <= stoi(argv[12]); k++)
         {
             //data=pipe.wait_for_frames(data);
             bFrame=pipe.try_wait_for_frames(&data);
@@ -637,14 +642,15 @@ int main(int argc, char* argv[]) try
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
         Mat image(Size(w, h), CV_8UC3, (void*)depth2.get_data(), Mat::AUTO_STEP);
-        std::string png_file= argv[4] + zero_padding(std::to_string(counter), 5)+".png";
+        std::string png_file= string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5)+".png";
         stbi_write_png(png_file.c_str(), depth2.as<rs2::video_frame>().get_width(), depth2.as<rs2::video_frame>().get_height(),
             depth2.as<rs2::video_frame>().get_bytes_per_pixel(), depth2.as<rs2::video_frame>().get_data(), depth2.as<rs2::video_frame>().get_stride_in_bytes());
 
         // Record per-frame metadata for UVC streams
         std::stringstream csv_file;
-        csv_file << "rs-save-to-disk-output-" << RGB_pc.as<rs2::video_frame>().get_profile().stream_name()
-            << "-metadata.csv";
+
+        //csv_file << "rs-save-to-disk-output-" << RGB_pc.as<rs2::video_frame>().get_profile().stream_name()<< "-metadata.csv"; //save frame metadata to csv file
+
         metadata_to_csv(RGB_pc.as<rs2::video_frame>(), csv_file.str());
 
         metadata_to_jsn(counter, event, RGB_pc.as<rs2::video_frame>());
@@ -655,7 +661,7 @@ int main(int argc, char* argv[]) try
         cv::Mat rgb_out = imageRGB.clone();
 
         // Update the window with new data
-        bool bVis = stoi(argv[10]);
+        bool bVis = stoi(argv[13]);
 
         //imshow(color_frame, imageRGB);
 
@@ -669,8 +675,8 @@ int main(int argc, char* argv[]) try
         //compression_params.push_back(100);
 
         //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/"+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
-        //imwrite(argv[4]+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
-        //imwrite(argv[4] + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB);
+        //imwrite(string(argv[6]) + string(argv[7])+ zero_padding(std::to_string(f), 5) +".jpg", imageRGB);
+        //imwrite(string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
         //detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
         detectObjects(counter, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
@@ -688,13 +694,13 @@ int main(int argc, char* argv[]) try
                 }
         }
 
-        imwrite(argv[4] + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB_pc);
+        imwrite(string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB_pc);
 
-        //detectObjects(f,imageRGB, argv[5], bBoxes, confThreshold, nmsThreshold,
+        //detectObjects(f,imageRGB, string(argv[6])+string(argv[8]), bBoxes, confThreshold, nmsThreshold,
         //    yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
-        //detectObjects(f, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
-        detectObjects(counter, imageRGB_pc, argv[5], bBoxes, confThreshold, nmsThreshold,
-            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 608, true);
+        //detectObjects(f, imageRGB_pc, string(argv[6])+string(argv[8]), bBoxes, confThreshold, nmsThreshold,
+        detectObjects(counter, imageRGB_pc, string(argv[6]) + string(argv[8]), bBoxes, confThreshold, nmsThreshold,
+            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 416, true);
 
 
         // Clear viewer
@@ -755,18 +761,18 @@ int main(int argc, char* argv[]) try
         viewer->removeAllShapes();
         // Load pcd and run obstacle detection process
         
-        if (stoi(argv[11])) renderPointCloud(viewer, cloud, "bagCloud");
+        if (stoi(argv[14])) renderPointCloud(viewer, cloud, "bagCloud");
         
         //renderPointCloud(viewer, newCloud, "bagCloud");
         viewer->spinOnce(); // Allow user to rotate point cloud and view it
         if (bBoxes.size() > 0)
         {
             ProcessPointClouds<Cloud_Type>* pointProcessorI = new ProcessPointClouds<Cloud_Type>();
-            //pointProcessorI->savePcd(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + ".pcd");
-            //pointProcessorI->saveBin(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + ".pcd");//bin
-            pcl::io::savePCDFileBinaryCompressed(argv[7] + zero_padding(std::to_string(counter), 5) +"_compressed_" + ".pcd", *cloud);
-            //pcl::io::savePLYFile(argv[7] + zero_padding(std::to_string(counter), 5) + ".ply", *cloud);
-            //pointProcessorI->saveBin(cloud, argv[7] + zero_padding(std::to_string(counter), 5) + ".ply");//bin
+            //pointProcessorI->savePcd(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".pcd");
+            //pointProcessorI->saveBin(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".pcd");//bin
+            pcl::io::savePCDFileBinaryCompressed(string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) +"_compressed" + ".pcd", *cloud);
+            //pcl::io::savePLYFile(string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".ply", *cloud);
+            //pointProcessorI->saveBin(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".ply");//bin
             saved_frames++;
             for (auto bBox : bBoxes)
             {
@@ -894,7 +900,7 @@ int main(int argc, char* argv[]) try
                             << coefficients->values[1] << " "
                             << coefficients->values[2] << " "
                             << coefficients->values[3] << std::endl;
-                        if (stoi(argv[11]))
+                        if (stoi(argv[14]))
                         {
                             renderPointCloud(viewer, filterCloud, "filterCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(1, 0, 1));
                             renderPointCloud(viewer, segmentCloud.second, "planeCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 0));
@@ -1006,7 +1012,7 @@ int main(int argc, char* argv[]) try
                                                     depth_contour_Cloud->points.push_back(point);
                                             }
 
-                                                //if (stoi(argv[11])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                                //if (stoi(argv[14])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
                                                 /*
                                                 std::cout << "Contour size is: " << depth_contour_Cloud->points.size() << std::endl;
                                                 //std::cout << "Colors: " << get<0>(RGB_Color) <<", " << get<1>(RGB_Color) << ", " << get<2>(RGB_Color) << std::endl;
@@ -1050,7 +1056,7 @@ int main(int argc, char* argv[]) try
                                     */
                                     std::cerr << "Concave hull has: " << cloud_hull->size()
                                         << " points." << std::endl;
-                                    if (stoi(argv[11])) renderPointCloud(viewer, cloud_hull, "cloud_hull" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1));
+                                    if (stoi(argv[14])) renderPointCloud(viewer, cloud_hull, "cloud_hull" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1));
                                     float concave_hull_area = calculatePolygonArea(*cloud_hull);
                                     std::cout << "Area within concave hull is: " << concave_hull_area << std::endl;
                                     float avg_area_per_point = concave_hull_area / cloud_projected->size();
@@ -1104,8 +1110,8 @@ int main(int argc, char* argv[]) try
                                     }
 
                                     //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
-                                    //imwrite(argv[6] + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
-                                    imwrite(argv[6] + zero_padding(std::to_string(counter), 5) + "_bkprj" + ".jpg", rgb_out);
+                                    //imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                    imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(counter), 5) + "_bkprj" + ".jpg", rgb_out);
 
                                     //}
                                     //if(render_box)
@@ -1227,7 +1233,7 @@ int main(int argc, char* argv[]) try
                                     std::cout << "cluster_pts_prmry_pca_axis_1: " << cluster_pts_prmry_pca_axis_1->points.size() << "." << std::endl;
                                     std::cout << "cluster_pts_prmry_pca_axis_2: " << cluster_pts_prmry_pca_axis_2->points.size() << "." << std::endl;
 
-                                    if (stoi(argv[11]))
+                                    if (stoi(argv[14]))
                                     {
                                         renderPointCloud(viewer, pca_end_points_z_out, "pca_end_points_z" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 10);
                                         renderPointCloud(viewer, pca_end_points_y_out, "pca_end_points_y" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 0, 0), 10);
@@ -1370,7 +1376,7 @@ int main(int argc, char* argv[]) try
     builder["indentation"] = "   ";
 
     std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    std::ofstream outputFileStream("log.json");
+    std::ofstream outputFileStream(string(argv[6])+"log.json");
     writer->write(event, &outputFileStream);
 
     //system("pause");
