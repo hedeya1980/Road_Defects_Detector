@@ -481,14 +481,15 @@ int main(int argc, char* argv[]) try
     // get playback device and disable realtime mode
     auto playback = selected_device.as<rs2::playback>();
     playback.set_real_time(false);
-
+    /*
     int fps = 30;
     std::chrono::nanoseconds duration = playback.get_duration();
     std::cout << "File duration: " << duration.count() << std::endl;
     float duration_s = duration.count() / (1e9);
     float frame_count = duration_s * fps;
     std::cout << "Estimated frame count: " << frame_count << std::endl;
-
+    */
+    float frame_count = 0.0;
     using namespace cv;
     const auto depth_frame = "Depth Image";
     const auto color_frame = "Color Image";
@@ -527,7 +528,9 @@ int main(int argc, char* argv[]) try
             break;
         else
         {
-            std::cout << "time between frames: " << curPos - lastPos << std::endl;
+            if (curPos == lastPos) frame_count -= 1;
+
+            //std::cout << "time between frames: " << curPos - lastPos << std::endl;
             counter++;
             lastPos = curPos;
             k++;
@@ -545,19 +548,21 @@ int main(int argc, char* argv[]) try
     //while (true)
         //while(!viewer->wasStopped()) && waitKey(1)< 0 && getWindowProperty(window_name, WND_PROP_AUTOSIZE) >= 0
     //{
-        int last_count = 0;
-        while (progress <= 1.0) {
-            int barWidth = 70;
+    int last_count = 0;
+    static int last_frame_number = 0;
+    while (progress <= 1.0)
+    {
+        int barWidth = 70;
 
-            std::cout << "[";
-            int pos = barWidth * progress;
-            for (int i = 0; i < barWidth; ++i) {
-                if (i < pos) std::cout << "=";
-                else if (i == pos) std::cout << ">";
-                else std::cout << " ";
-            }
-            std::cout << "] " << int(progress * 100.0) << " %\r";
-            std::cout.flush();
+        std::cout << "[";
+        int pos = barWidth * progress;
+        for (int i = 0; i < barWidth; ++i) {
+            if (i < pos) std::cout << "=";
+            else if (i == pos) std::cout << ">";
+            else std::cout << " ";
+        }
+        std::cout << "] " << int(progress * 100.0) << " %\r";
+        std::cout.flush();
 
         std::cout << std::endl;
 
@@ -565,25 +570,26 @@ int main(int argc, char* argv[]) try
         // to depth viewport and the other to color.
         // Creating align object is an expensive operation
         // that should not be performed in the main loop
-        
+
         //for (int k = 0; k < 2; k++)
         //int k = 0;
         //while (k < stoi(argv[12]))
         for (int k = 0; k <= stoi(argv[12]); k++)
         {
             //data=pipe.wait_for_frames(data);
-            bFrame=pipe.try_wait_for_frames(&data);
+            bFrame = pipe.try_wait_for_frames(&data);
             curPos = playback.get_position();
             if (curPos < lastPos)
                 break;
             else
             {
+                if (curPos == lastPos) frame_count -= 1;
                 counter++;
                 lastPos = curPos;
                 //k++;
             }
         }
-        
+
         //rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
 
         auto startTime_alignment_process = std::chrono::steady_clock::now();
@@ -597,6 +603,15 @@ int main(int argc, char* argv[]) try
 
         rs2::depth_frame depth_pc = data.get_depth_frame();//.apply_filter(color_map);
         rs2::frame RGB_pc = data.get_color_frame();
+
+        // If we only received new depth frame, 
+        // but the color did not update, continue
+        //if (RGB_pc.get_frame_number() == last_frame_number) continue;
+        if (RGB_pc.get_frame_number() != last_frame_number)
+        {
+        last_frame_number = static_cast<int>(RGB_pc.get_frame_number());
+        //std::cout << "last frame_number: " << last_frame_number << std::endl;
+
 
         rs2::depth_frame depth = data_aligned_to_color.get_depth_frame();//.apply_filter(color_map);
         rs2::frame depth2 = data_aligned_to_color.get_depth_frame().apply_filter(color_map);
@@ -642,7 +657,7 @@ int main(int argc, char* argv[]) try
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
         Mat image(Size(w, h), CV_8UC3, (void*)depth2.get_data(), Mat::AUTO_STEP);
-        std::string png_file= string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5)+".png";
+        std::string png_file = string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5) + ".png";
         stbi_write_png(png_file.c_str(), depth2.as<rs2::video_frame>().get_width(), depth2.as<rs2::video_frame>().get_height(),
             depth2.as<rs2::video_frame>().get_bytes_per_pixel(), depth2.as<rs2::video_frame>().get_data(), depth2.as<rs2::video_frame>().get_stride_in_bytes());
 
@@ -742,6 +757,14 @@ int main(int argc, char* argv[]) try
             std::cout << "Color Frame Width: " << w_rgb << ", " << "Color Frame Height: " << h_rgb << std::endl;
             std::cout << "Original Depth Frame Width: " << w_pc << ", " << "Original Depth Frame Height: " << h_pc << std::endl;
             std::cout << "Aligned Depth Frame Width: " << w << ", " << "Aligned Depth Frame Height: " << h << std::endl;
+
+            int fps = RGB_pc.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
+            std::chrono::nanoseconds duration = playback.get_duration();
+            std::cout << "File duration: " << duration.count() << std::endl;
+            float duration_s = duration.count() / (1e9);
+            frame_count += duration_s * fps;
+            std::cout << "Estimated frame count: " << frame_count << std::endl;
+
             first_f = 1;
         }
         pcl::getMinMax3D(*cloud, minPt, maxPt);
@@ -760,9 +783,9 @@ int main(int argc, char* argv[]) try
         viewer->removeAllPointClouds();
         viewer->removeAllShapes();
         // Load pcd and run obstacle detection process
-        
+
         if (stoi(argv[14])) renderPointCloud(viewer, cloud, "bagCloud");
-        
+
         //renderPointCloud(viewer, newCloud, "bagCloud");
         viewer->spinOnce(); // Allow user to rotate point cloud and view it
         if (bBoxes.size() > 0)
@@ -770,20 +793,26 @@ int main(int argc, char* argv[]) try
             ProcessPointClouds<Cloud_Type>* pointProcessorI = new ProcessPointClouds<Cloud_Type>();
             //pointProcessorI->savePcd(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".pcd");
             //pointProcessorI->saveBin(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".pcd");//bin
-            pcl::io::savePCDFileBinaryCompressed(string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) +"_compressed" + ".pcd", *cloud);
+            pcl::io::savePCDFileBinaryCompressed(string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + "_compressed" + ".pcd", *cloud);
             //pcl::io::savePLYFile(string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".ply", *cloud);
             //pointProcessorI->saveBin(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".ply");//bin
             saved_frames++;
             for (auto bBox : bBoxes)
             {
+                event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)]["classID"] = bBox.classID;
+                event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)]["confidence"] = bBox.confidence;
+                event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)]["x"] = bBox.roi.x;
+                event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)]["y"] = bBox.roi.y;
+                event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)]["width"] = bBox.roi.width;
+                event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)]["height"] = bBox.roi.height;
                 auto startTime_bb_conversion_projection = std::chrono::steady_clock::now();
                 float Point3d_tl[3], Point3d_tr[3], Point3d_bl[3], Point3d_br[3], Point3d_cc[3];
                 float Point3d_tl_depth[3], Point3d_tr_depth[3], Point3d_bl_depth[3], Point3d_br_depth[3], Point3d_cc_depth[3];
-                int x_tl = std::max(bBox.roi.x, 0) , x_tr = std::min(bBox.roi.x + bBox.roi.width, w_rgb-1), x_bl = std::max(bBox.roi.x, 0), x_br = std::min(bBox.roi.x + bBox.roi.width, w_rgb-1);
-                int y_tl = std::max(bBox.roi.y, 0), y_tr = std::max(bBox.roi.y, 0), y_bl = std::min(bBox.roi.y + bBox.roi.height, h_rgb-1), y_br = std::min(bBox.roi.y + bBox.roi.height, h_rgb-1);
+                int x_tl = std::max(bBox.roi.x, 0), x_tr = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 1), x_bl = std::max(bBox.roi.x, 0), x_br = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 1);
+                int y_tl = std::max(bBox.roi.y, 0), y_tr = std::max(bBox.roi.y, 0), y_bl = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 1), y_br = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 1);
                 int x_cc = int(x_tl + (x_br - x_tl) / 2);
                 int y_cc = int(y_tl + (y_br - y_tl) / 2);
-                
+
                 float pixel_tl[2] = { float(x_tl),float(y_tl) };
                 float pixel_tr[2] = { float(x_tr),float(y_tr) };
                 float pixel_bl[2] = { float(x_bl),float(y_bl) };
@@ -795,7 +824,7 @@ int main(int argc, char* argv[]) try
                 float pixel_distance_in_meters_bl = depth.get_distance(x_bl, y_bl);
                 float pixel_distance_in_meters_br = depth.get_distance(x_br, y_br);
                 float pixel_distance_in_meters_cc = depth.get_distance(x_cc, y_cc);
-                
+
                 rs2_deproject_pixel_to_point(Point3d_tl, &color_intrin, pixel_tl, pixel_distance_in_meters_tl);
                 rs2_transform_point_to_point(Point3d_tl_depth, &color_extrin_to_depth, Point3d_tl);
                 rs2_deproject_pixel_to_point(Point3d_tr, &color_intrin, pixel_tr, pixel_distance_in_meters_tr);
@@ -808,7 +837,7 @@ int main(int argc, char* argv[]) try
                 rs2_transform_point_to_point(Point3d_cc_depth, &color_extrin_to_depth, Point3d_cc);
                 /*
                 std::cout <<"tl: "<< "(" << x_tl << ", " << y_tl << ")" << ", br: " << "(" << x_br << ", " << y_br << ")" << ", cc: " << "(" << x_cc << ", " << y_cc << ")" << std::endl;
-                
+
                 std::cout << "*** Distance to center of Bbox is: " << pixel_distance_in_meters_cc << " m. ***" << std::endl;
 
                 std::cout << "tl_depth: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << ", " << std::endl;
@@ -820,11 +849,11 @@ int main(int argc, char* argv[]) try
 
                 auto endTime_projection = std::chrono::steady_clock::now();
                 auto elapsedTime_projection = std::chrono::duration_cast<std::chrono::milliseconds>(endTime_projection - startTime_bb_conversion_projection);
-                std::cout << "Bbox" + zero_padding(std::to_string(bBox.boxID), 2)+ " Conversion/Projection took " << elapsedTime_projection.count() << " milliseconds" << std::endl;
+                std::cout << "Bbox" + zero_padding(std::to_string(bBox.boxID), 2) + " Conversion/Projection took " << elapsedTime_projection.count() << " milliseconds" << std::endl;
 
                 std::vector<float> z_vec_depth = { Point3d_tl_depth[2], Point3d_tr_depth[2], Point3d_bl_depth[2], Point3d_br_depth[2] };
                 std::tuple<float, float> z_min_max_depth = min_max(z_vec_depth);
-                
+
                 //float projected_xmin, projected_ymin, projected_zmin, projected_xmax, projected_ymax, projected_zmax;
                 float ROI_xmin, ROI_ymin, ROI_zmin, ROI_xmax, ROI_ymax, ROI_zmax;
                 if (classes[bBox.classID] == "Potholes")
@@ -985,7 +1014,7 @@ int main(int argc, char* argv[]) try
                                     int max_level = 150;
                                     int min_level = -110;
                                     int j = 0;
-               
+
                                     //int capacity = 0;
                                     int pos_capacity = 0;
                                     int neg_capacity = 0;
@@ -1012,15 +1041,15 @@ int main(int argc, char* argv[]) try
                                                     depth_contour_Cloud->points.push_back(point);
                                             }
 
-                                                //if (stoi(argv[14])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
-                                                /*
-                                                std::cout << "Contour size is: " << depth_contour_Cloud->points.size() << std::endl;
-                                                //std::cout << "Colors: " << get<0>(RGB_Color) <<", " << get<1>(RGB_Color) << ", " << get<2>(RGB_Color) << std::endl;
-                                                cout << endl;
-                                                cout << "Press [Q] in viewer to continue. " << endl;
-                                                */
+                                            //if (stoi(argv[14])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                            /*
+                                            std::cout << "Contour size is: " << depth_contour_Cloud->points.size() << std::endl;
+                                            //std::cout << "Colors: " << get<0>(RGB_Color) <<", " << get<1>(RGB_Color) << ", " << get<2>(RGB_Color) << std::endl;
+                                            cout << endl;
+                                            cout << "Press [Q] in viewer to continue. " << endl;
+                                            */
 
-                                                //if (min_depth < 0 && max_depth < 0)
+                                            //if (min_depth < 0 && max_depth < 0)
                                             if (it->first > 0)
                                                 pos_capacity += (it->first) * depth_estimation[it->first].size();
                                             else if (it->first < 0)
@@ -1119,9 +1148,9 @@ int main(int argc, char* argv[]) try
                                     //Box box = pointProcessor.BoundingBox(cluster);
                                     //renderBox(viewer, box, clusterId);
                                     //}
-                                    
+
                                     cc.box = pointProcessorI->BoundingBoxQ(cluster);
-                                    renderBox(viewer, cc.box, stoi(std::to_string(bBox.boxID)+std::to_string(cc.clusterID)));//std::to_string(bBox.boxID)
+                                    renderBox(viewer, cc.box, stoi(std::to_string(bBox.boxID) + std::to_string(cc.clusterID)));//std::to_string(bBox.boxID)
                                     // Compute principal directions
                                     Eigen::Vector4f pcaCentroid;
                                     //pcl::compute3DCentroid(*cloud_projected, pcaCentroid);
@@ -1149,8 +1178,8 @@ int main(int argc, char* argv[]) try
                                     const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
                                     const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
 
-                                    
-                                    
+
+
 
                                     //PCABox<Cloud_Type>(cluster, eigenVectorsPCA, bboxTransform);
                                     //const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/watch?v=mHVwd8gYLnI
@@ -1347,18 +1376,20 @@ int main(int argc, char* argv[]) try
                     ROI_ymax = std::min(std::min(Point3d_bl_depth[1], Point3d_br_depth[1]), maxPt.y);
                     ROI_zmax = std::min(std::min(Point3d_tl_depth[2], Point3d_tr_depth[2]), maxPt.z);
                 }
-              
+
             }
         }
         auto endTime = std::chrono::steady_clock::now();
         auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime_pc_processing);
         std::cout << "Point cloud processing took " << elapsedTime.count() << " milliseconds" << std::endl;
         std::cout << "-----------------------------------------------------------------------" << std::endl;
-
+    }
+    else
+        frame_count -= 1;
         //progress += float(f) / (frame_count); // for demonstration only
         progress += (float(counter)-float(last_count)) / frame_count; // for demonstration only
         last_count = counter;
-        std::cout << "Counter: " << counter << ", Total frames (est.): "<< frame_count << std::endl;
+        std::cout << "Counter: " << counter << ", Total frames (est., excluding frame drops): "<< frame_count << std::endl;
 
         
         if ((curPos < lastPos) || (not bFrame))
@@ -1366,7 +1397,7 @@ int main(int argc, char* argv[]) try
             break;
         }
         
-        }
+    }
         pipe.stop();
 
     //}
@@ -1380,8 +1411,8 @@ int main(int argc, char* argv[]) try
     writer->write(event, &outputFileStream);
 
     //system("pause");
-    std::cout << "Paused. Press 'Enter' key to exit.";
-    std::cin.ignore();
+    //std::cout << "Paused. Press 'Enter' key to exit.";
+    //std::cin.ignore();
 
     return EXIT_SUCCESS;
 }
