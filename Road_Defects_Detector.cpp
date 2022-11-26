@@ -65,7 +65,12 @@
 
 #include <C:/Program Files (x86)/jsoncpp/include/json/writer.h>
 
-namespace fs = std::filesystem;
+#include <torch/script.h>
+#include <torch/torch.h>
+#include <experimental/filesystem>
+
+//namespace fs = std::filesystem;
+namespace fs = std::experimental::filesystem;
 
 // object detection
 /*
@@ -121,6 +126,212 @@ to_chrono_time_point(double d)
     return sys_days{ December / 30 / 1899 } + round<system_clock::duration>(ddays{ d });
 }
 */
+
+float mat_mean(cv::Mat img)
+{
+    vector<int> elem;
+    int index;
+    float mean_v = 0;
+    int c = 0;
+    for (int i = 0; i <= img.rows; i++)
+    {
+        for (int j = 0; j < img.cols; j++)
+        {
+            int pix = img.at<uchar>(i, j);
+            mean_v += pix;
+            elem.push_back(pix);
+            c+=1;
+        }
+    }
+    std::sort(elem.begin(), elem.end());
+    if (elem.size() % 2 == 0)
+        index = elem.size() / 2 - 1;
+    else
+        index = (elem.size() - 1) / 2;
+    std::cout << "c: " << c << ", size: " <<img.rows<<", "<<img.cols << ", "<< (img.rows) * (img.cols) << ", " <<elem.size()<< std::endl;
+    std::cout << "mean: " << mean_v / elem.size() << ", median: " << elem[index]<<", at index: "<<index << std::endl;
+    std::cout << "25%: " << elem[int(elem.size()*0.25)]<<", at: "<< int(elem.size() * 0.25) << ", 75%: " << elem[int(elem.size() * 0.75)] << ", at: " << int(elem.size() * 0.75) <<", 90%: " << elem[int(elem.size() * 0.9)] << ", at: " << int(elem.size() * 0.9) << std::endl;
+    return mean_v/((img.rows)*(img.cols));
+}
+
+int mat_percentile(cv::Mat img, float perc)
+{
+    vector<int> elem;
+    int index;
+    for (int i = 0; i <= img.rows; i++)
+    {
+        for (int j = 0; j < img.cols; j++)
+        {
+            int pix = img.at<uchar>(i, j);
+            elem.push_back(pix);
+        }
+    }
+    std::sort(elem.begin(), elem.end());
+    index = perc * elem.size();
+    return elem[index];
+}
+
+
+std::string get_image_type(const cv::Mat& img, bool more_info = true)
+{
+    std::string r;
+    int type = img.type();
+    uchar depth = type & CV_MAT_DEPTH_MASK;
+    uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+    switch (depth) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+    }
+
+    r += "C";
+    r += (chans + '0');
+
+    if (more_info)
+        std::cout << "depth: " << img.depth() << " channels: " << img.channels() << std::endl;
+
+    return r;
+}
+
+void show_image(cv::Mat& img, std::string title)
+{
+    std::string image_type = get_image_type(img);
+    cv::namedWindow(title + " type:" + image_type, cv::WINDOW_NORMAL); // Create a window for display.
+    cv::imshow(title, img);
+    cv::waitKey(0);
+}
+
+auto transpose(torch::Tensor tensor, c10::IntArrayRef dims = { 0, 3, 1, 2 })
+{
+    std::cout << "############### transpose ############" << std::endl;
+    std::cout << "shape before : " << tensor.sizes() << std::endl;
+    tensor = tensor.permute(dims);
+    std::cout << "shape after : " << tensor.sizes() << std::endl;
+    std::cout << "######################################" << std::endl;
+    return tensor;
+}
+
+auto ToTensor(cv::Mat img, bool show_output = false, bool unsqueeze = false, int unsqueeze_dim = 0)
+{
+    std::cout << "image shape: " << img.size() << std::endl;
+    torch::Tensor tensor_image = torch::from_blob(img.data, { img.rows, img.cols, 3 }, torch::kByte);
+
+    if (unsqueeze)
+    {
+        tensor_image.unsqueeze_(unsqueeze_dim);
+        std::cout << "tensors new shape: " << tensor_image.sizes() << std::endl;
+    }
+
+    if (show_output)
+    {
+        std::cout << tensor_image.slice(2, 0, 1) << std::endl;
+    }
+    std::cout << "tenor shape: " << tensor_image.sizes() << std::endl;
+    return tensor_image;
+}
+
+auto ToInput(torch::Tensor tensor_image)
+{
+    // Create a vector of inputs.
+    return std::vector<torch::jit::IValue>{tensor_image};
+}
+
+auto ToCvImage(torch::Tensor tensor)
+{
+    //int width = tensor.sizes()[0];
+    //int height = tensor.sizes()[1];
+    int width = 448;
+    int height = 448;
+    try
+    {
+        cv::Mat output_mat(cv::Size{ height, width }, CV_8UC3, tensor.data_ptr<uchar>());
+
+        show_image(output_mat, "converted image from tensor");
+        return output_mat.clone();
+    }
+    catch (const c10::Error& e)
+    {
+        std::cout << "an error has occured : " << e.msg() << std::endl;
+    }
+    return cv::Mat(height, width, CV_8UC3);
+}
+
+void unet_forward(cv::Mat img, cv::Mat &resultImg)
+{
+    cv::Mat img_1;
+    cv::resize(img, img_1, cv::Size(448, 448), 0, 0, cv::INTER_AREA);
+
+    // convert the cvimage into tensor
+    auto tensor = ToTensor(img_1);
+
+    //std::cout << "To Tensor: " << tensor.sizes() << std::endl;
+
+    // swap axis 
+    tensor = transpose(tensor, { (2),(0),(1) });
+
+    //std::cout << "transpose: " << tensor.sizes() << std::endl;
+
+    // convert the tensor into float and scale it 
+    tensor = tensor.toType(c10::kFloat).div(255);
+
+    //normalize
+    tensor[0] = tensor[0].sub_(0.485).div_(0.229);
+    tensor[1] = tensor[1].sub_(0.456).div_(0.224);
+    tensor[2] = tensor[2].sub_(0.406).div_(0.225);
+
+    //add batch dim (an inplace operation just like in pytorch)
+    tensor.unsqueeze_(0);
+
+    tensor = tensor.to(torch::kCUDA);
+
+    //std::cout << "unsqueeze: " << tensor.sizes() << std::endl;
+
+    auto input_to_net = ToInput(tensor);
+
+    torch::jit::script::Module module;
+
+    try
+    {
+        // Deserialize the ScriptModule from a file using torch::jit::load().
+        module = torch::jit::load("D:/Post_Grad/STDF/crack_segmentation-master_original/traced_unet-vgg16_model.pt");
+    }
+    catch (const c10::Error& e)
+    {
+        std::cerr << "error loading the model\n" << e.msg();
+        std::system("pause");
+    }
+
+    // Execute the model and turn its output into a tensor.
+    torch::Tensor output = module.forward(input_to_net).toTensor();
+
+    //sizes() gives shape. 
+    //std::cout << output.sizes() << std::endl;
+    //std::cout << "output: " << output[0] << std::endl;
+    //std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/5) << '\n';
+    output = torch::sigmoid(output);
+
+    auto out_tensor = output.squeeze(0).detach().permute({ 1, 2, 0 });
+    //auto out_tensor = output.squeeze().detach();
+    //std::cout << "out_tensor (after squeeze & detach): " << out_tensor.sizes() << std::endl;
+    out_tensor = out_tensor.mul(255).clamp(0, 255).to(torch::kU8);
+    out_tensor = out_tensor.to(torch::kCPU);
+    out_tensor.contiguous();
+    //cv::Mat resultImg(448, 448, CV_8U);
+    std::memcpy((void*)resultImg.data, out_tensor.data_ptr(), sizeof(torch::kU8) * out_tensor.numel());
+    //cv::Mat cropedImage = resultImg(cv::Rect(0, 0, 448/3, 448/3));
+    cv::resize(resultImg, resultImg, cv::Size(img.size[1], img.size[0]), 0, 0, cv::INTER_AREA);
+    //cv::resize(cropedImage, cropedImage, cv::Size(1280, 720), 0, 0, cv::INTER_LINEAR);
+
+    //cv::imwrite("D:/Post_Grad/STDF/crack_segmentation-master_original/test_images_mine/00544-seg-2.jpg", resultImg);
+    //cv::imwrite("D:/Post_Grad/STDF/crack_segmentation-master_original/test_images_mine/00526-seg-2.jpg", cropedImage);
+}
+
 
 void metadata_to_csv(const rs2::frame& frm, const std::string& filename)
 {
@@ -461,9 +672,11 @@ int main(int argc, char* argv[]) try
     rs2::pipeline_profile profile = pipe.start(cfg);
 
     const rs2::stream_profile color_profile = profile.get_stream(RS2_STREAM_COLOR);
+    //const rs2::stream_profile color_profile = profile.get_stream(RS2_STREAM_INFRARED);
     const rs2::stream_profile depth_profile = profile.get_stream(RS2_STREAM_DEPTH);
     rs2::align align_to_depth(RS2_STREAM_DEPTH);
     rs2::align align_to_color(RS2_STREAM_COLOR);
+    //rs2::align align_to_color(RS2_STREAM_INFRARED);
     rs2::frameset data;
     rs2::frameset data_aligned_to_color;
 
@@ -673,7 +886,9 @@ int main(int argc, char* argv[]) try
 
         Mat imageRGB(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB.get_data(), Mat::AUTO_STEP);
         Mat imageRGB_pc(Size(w_rgb, h_rgb), CV_8UC3, (void*)RGB_pc.get_data(), Mat::AUTO_STEP);
-        cv::Mat rgb_out = imageRGB.clone();
+        cvtColor(imageRGB_pc, imageRGB_pc, COLOR_BGR2RGB);
+        //cv::Mat rgb_out = imageRGB.clone();
+        cv::Mat rgb_out = imageRGB_pc.clone();
 
         // Update the window with new data
         bool bVis = stoi(argv[13]);
@@ -694,6 +909,7 @@ int main(int argc, char* argv[]) try
         //imwrite(string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB);
         //detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold, nmsThreshold,
         //detectObjects(f, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
+        /*
         detectObjects(counter, imageRGB_pc, "C:/Users/hedey/source/repos/Run_EXE_Road_Defects_Detector/x64/Release/faces/", face_bBoxes, 0.5, nmsThreshold,
             yoloBasePath, face_classes, yoloFaceModelConfiguration, yoloFaceModelWeights, bVis, 416, true);
         for (auto fbBox : face_bBoxes)
@@ -708,15 +924,43 @@ int main(int argc, char* argv[]) try
                     roi.at<cv::Vec3b>(j, i) = p;
                 }
         }
-
+        */
         imwrite(string(argv[6]) + string(argv[7]) + zero_padding(std::to_string(counter), 5) + ".jpg", imageRGB_pc);
 
         //detectObjects(f,imageRGB, string(argv[6])+string(argv[8]), bBoxes, confThreshold, nmsThreshold,
         //    yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis);
         //detectObjects(f, imageRGB_pc, string(argv[6])+string(argv[8]), bBoxes, confThreshold, nmsThreshold,
         detectObjects(counter, imageRGB_pc, string(argv[6]) + string(argv[8]), bBoxes, confThreshold, nmsThreshold,
-            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 416, true);
+            yoloBasePath, classes, yoloModelConfiguration, yoloModelWeights, bVis, 416, true);//608, 416
 
+        cv::Mat resultImg(448, 448, CV_8U);
+        unet_forward(imageRGB_pc, resultImg);
+        imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(counter), 5) + "_unet" + ".jpg", resultImg);
+
+        //int x = resultImg.at<uchar>(640, 360);//getting the pixel values//
+        //std::cout << x << std::endl;
+
+        cv::Mat unet_out = imageRGB_pc.clone();
+
+        for (int i = 0; i < resultImg.rows; ++i)
+        {
+            for (int j = 0; j < resultImg.cols; ++j)
+            {
+                //std::cout << j <<", "<<i << std::endl;
+                //std::cout << mask.at<cv::Vec3b>(i, j)[0]<<", "<< mask.at<cv::Vec3b>(i, j)[1]<<", "<< mask.at<cv::Vec3b>(i, j)[2] << std::endl;
+                int pix = resultImg.at<uchar>(i, j);
+                if (pix > 15)
+                    //if ((mask.at<cv::Vec3b>(i, j)[0] == 255) && (mask.at<cv::Vec3b>(i, j)[1] == 255) && (mask.at<cv::Vec3b>(i, j)[2] == 255))
+                {
+                    //std::cout << pix << std::endl;
+                    cv::circle(unet_out, cv::Point(j, i), 0, cv::Scalar(0, 255, 0), 1, 8, 0);
+                }
+
+            }
+        }
+
+        //cv::namedWindow("unet_out", cv::WINDOW_NORMAL);
+        //cv::imshow("unet_out", unet_out);
 
         // Clear viewer
         //viewer->removeAllPointClouds();
@@ -735,7 +979,7 @@ int main(int argc, char* argv[]) try
 
         // Convert generated Point Cloud to PCL Formatting
         pcl::PointCloud<Cloud_Type>::Ptr cloud = PCL_Conversion<Cloud_Type>(points, RGB_pc);
-
+        
         //========================================
         // Filter PointCloud (PassThrough Method)
         //========================================
@@ -790,6 +1034,7 @@ int main(int argc, char* argv[]) try
         viewer->spinOnce(); // Allow user to rotate point cloud and view it
         if (bBoxes.size() > 0)
         {
+            cv::namedWindow("unet_out_2", cv::WINDOW_NORMAL);
             ProcessPointClouds<Cloud_Type>* pointProcessorI = new ProcessPointClouds<Cloud_Type>();
             //pointProcessorI->savePcd(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".pcd");
             //pointProcessorI->saveBin(cloud, string(argv[6]) + string(argv[10]) + zero_padding(std::to_string(counter), 5) + ".pcd");//bin
@@ -808,8 +1053,10 @@ int main(int argc, char* argv[]) try
                 auto startTime_bb_conversion_projection = std::chrono::steady_clock::now();
                 float Point3d_tl[3], Point3d_tr[3], Point3d_bl[3], Point3d_br[3], Point3d_cc[3];
                 float Point3d_tl_depth[3], Point3d_tr_depth[3], Point3d_bl_depth[3], Point3d_br_depth[3], Point3d_cc_depth[3];
-                int x_tl = std::max(bBox.roi.x, 0), x_tr = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 1), x_bl = std::max(bBox.roi.x, 0), x_br = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 1);
-                int y_tl = std::max(bBox.roi.y, 0), y_tr = std::max(bBox.roi.y, 0), y_bl = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 1), y_br = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 1);
+                //int x_tl = std::max(bBox.roi.x, 0), x_tr = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 1), x_bl = std::max(bBox.roi.x, 0), x_br = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 1);
+                int x_tl = std::max(bBox.roi.x, 50), x_tr = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 51), x_bl = std::max(bBox.roi.x, 50), x_br = std::min(bBox.roi.x + bBox.roi.width, w_rgb - 51);
+                //int y_tl = std::max(bBox.roi.y, 0), y_tr = std::max(bBox.roi.y, 0), y_bl = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 1), y_br = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 1);
+                int y_tl = std::max(bBox.roi.y, 50), y_tr = std::max(bBox.roi.y, 50), y_bl = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 51), y_br = std::min(bBox.roi.y + bBox.roi.height, h_rgb - 51);
                 int x_cc = int(x_tl + (x_br - x_tl) / 2);
                 int y_cc = int(y_tl + (y_br - y_tl) / 2);
 
@@ -856,7 +1103,7 @@ int main(int argc, char* argv[]) try
 
                 //float projected_xmin, projected_ymin, projected_zmin, projected_xmax, projected_ymax, projected_zmax;
                 float ROI_xmin, ROI_ymin, ROI_zmin, ROI_xmax, ROI_ymax, ROI_zmax;
-                if (classes[bBox.classID] == "Potholes")
+                if ((classes[bBox.classID] == "Potholes")|| (classes[bBox.classID] == "Transverse Crack") || (classes[bBox.classID] == "Block Crack") || (classes[bBox.classID] == "Longitudinal Crack") || (classes[bBox.classID] == "Aligator Crack") || (classes[bBox.classID] == "Sealed Reflective Crack") || (classes[bBox.classID] == "Sealed Longitudinal Crack"))
                 {
                     //projected_xmin = std::max(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), minPt.x);
                     //projected_ymin = std::max(std::min(Point3d_tl_depth[1], Point3d_tr_depth[1]), minPt.y);
@@ -864,12 +1111,16 @@ int main(int argc, char* argv[]) try
                     //projected_xmax = std::min(std::max(Point3d_tr_depth[0], Point3d_br_depth[0]), maxPt.x);
                     //projected_ymax = std::min(std::max(Point3d_bl_depth[1], Point3d_br_depth[1]), maxPt.y);
                     //projected_zmax = std::min(std::max(Point3d_tl_depth[2], Point3d_tr_depth[2]), maxPt.z);
-                    ROI_xmin = std::max(std::min(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), std::min(Point3d_br_depth[0], Point3d_tr_depth[0])), minPt.x);
-                    ROI_ymin = std::max(std::min(std::min(Point3d_tl_depth[1], Point3d_tr_depth[1]), std::min(Point3d_bl_depth[1], Point3d_br_depth[1])), minPt.y);
-                    ROI_zmin = std::max(std::min(std::min(Point3d_bl_depth[2], Point3d_br_depth[2]), std::min(Point3d_tl_depth[2], Point3d_tr_depth[2])), minPt.z);
-                    ROI_xmax = std::min(std::max(std::max(Point3d_tr_depth[0], Point3d_br_depth[0]), std::max(Point3d_tl_depth[0], Point3d_bl_depth[0])), maxPt.x);
-                    ROI_ymax = std::min(std::max(std::max(Point3d_bl_depth[1], Point3d_br_depth[1]), std::max(Point3d_tl_depth[1], Point3d_tr_depth[1])), maxPt.y);
-                    ROI_zmax = std::min(std::max(std::max(Point3d_tl_depth[2], Point3d_tr_depth[2]), std::max(Point3d_bl_depth[2], Point3d_br_depth[2])), maxPt.z);
+                    
+                    //ROI_xmin = std::max(std::min(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), std::min(Point3d_br_depth[0], Point3d_tr_depth[0])), minPt.x);
+                    ROI_xmin = std::max(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), minPt.x);
+                    ROI_ymin = std::max(std::min(Point3d_tl_depth[1], Point3d_tr_depth[1]), minPt.y);
+                    ROI_zmin = std::max(std::min(Point3d_bl_depth[2], Point3d_br_depth[2]), minPt.z);
+                    ROI_xmax = std::min(std::max(Point3d_tr_depth[0], Point3d_br_depth[0]), maxPt.x);
+                    ROI_ymax = std::min(std::max(Point3d_bl_depth[1], Point3d_br_depth[1]), maxPt.y);
+                    ROI_zmax = std::min(std::max(Point3d_tl_depth[2], Point3d_tr_depth[2]), maxPt.z);
+                    //cout << ROI_zmin << ": " << Point3d_bl_depth[2]<<", " << Point3d_br_depth[2] << ", " << Point3d_tl_depth[2] << ", " << Point3d_tr_depth[2] << ", " << minPt.z << endl;
+                    //cout << ROI_zmax << ": " << Point3d_tl_depth[2]<<", " << Point3d_tr_depth[2] << ", " << Point3d_bl_depth[2] << ", " << Point3d_br_depth[2] << ", " << maxPt.z << endl;
                     /*
                     projected_xmin = std::max(std::min(Point3d_tl_depth[0], Point3d_br_depth[0]), minPt.x);
                     projected_ymin = std::max(std::min(Point3d_tl_depth[1], Point3d_br_depth[1]), minPt.y);
@@ -882,11 +1133,20 @@ int main(int argc, char* argv[]) try
                     // Filter PointCloud (PassThrough Method)
                     //========================================
                     /*
+                    pcl::PointCloud<Cloud_Type>::Ptr filterCloud;
                     pcl::PassThrough<Cloud_Type> Cloud_Filter; // Create the filtering object
                     Cloud_Filter.setInputCloud(cloud);           // Input generated cloud to filter
+                    Cloud_Filter.setFilterFieldName("x");        // Set field name to Z-coordinate
+                    Cloud_Filter.setFilterLimits(ROI_xmin, ROI_xmax);      // Set accepted interval values
+                    Cloud_Filter.filter(*filterCloud);              // Filtered Cloud Outputted
+                    Cloud_Filter.setInputCloud(filterCloud);           // Input generated cloud to filter
+                    Cloud_Filter.setFilterFieldName("y");        // Set field name to Z-coordinate
+                    Cloud_Filter.setFilterLimits(ROI_ymin, ROI_ymax);      // Set accepted interval values
+                    Cloud_Filter.filter(*filterCloud);              // Filtered Cloud Outputted
+                    Cloud_Filter.setInputCloud(filterCloud);           // Input generated cloud to filter
                     Cloud_Filter.setFilterFieldName("z");        // Set field name to Z-coordinate
                     Cloud_Filter.setFilterLimits(ROI_zmin, ROI_zmax);      // Set accepted interval values
-                    Cloud_Filter.filter(*newCloud);              // Filtered Cloud Outputted
+                    Cloud_Filter.filter(*filterCloud);              // Filtered Cloud Outputted                    
                     */
 
                     pcl::PointCloud<Cloud_Type>::Ptr filterCloud = pointProcessorI->FilterCloud(cloud, 0.1f, Eigen::Vector4f(ROI_xmin, ROI_ymin, ROI_zmin, 1), Eigen::Vector4f(ROI_xmax, ROI_ymax, ROI_zmax, 1)); //Best
@@ -896,9 +1156,19 @@ int main(int argc, char* argv[]) try
                     pcl::PointCloud<Cloud_Type>::Ptr filterCloud = pointProcessorI->FilterCloud(newCloud, 0.1f, Eigen::Vector4f(ROI_xmin, ROI_ymin, ROI_zmin, 1), Eigen::Vector4f(ROI_xmax, ROI_ymax, ROI_zmax, 1)); //Best
                     */
                     //filterCloud = pointProcessorI->FilterCloud(newCloud, 0.1f, Eigen::Vector4f(ROI_xmin, ROI_ymin, ROI_zmin, 1), Eigen::Vector4f(ROI_xmax, ROI_ymax, ROI_zmax, 1)); //Best
+                    /*
+                    std::cout << "tl-2D: " << pixel_tl[0] << ", " << pixel_tl[1] << std::endl;
+                    std::cout << "tl-3D: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << std::endl;
+                    std::cout << "tr-2D: " << pixel_tr[0] << ", " << pixel_tr[1] << std::endl;
+                    std::cout << "tr-3D: " << Point3d_tr_depth[0] << ", " << Point3d_tr_depth[1] << ", " << Point3d_tr_depth[2] << std::endl;
+                    std::cout << "br-2D: " << pixel_br[0] << ", " << pixel_br[1] << std::endl;
+                    std::cout << "br-3D: " << Point3d_br_depth[0] << ", " << Point3d_br_depth[1] << ", " << Point3d_br_depth[2] << std::endl;
+                    std::cout << "bl-2D: " << pixel_bl[0] << ", " << pixel_bl[1] << std::endl;
+                    std::cout << "bl-3D: " << Point3d_bl_depth[0] << ", " << Point3d_bl_depth[1] << ", " << Point3d_bl_depth[2] << std::endl;
+                    
                     std::cout << "ROI min: " << ROI_xmin << ", " << ROI_ymin << ", " << ROI_zmin << std::endl;
                     std::cout << "ROI max: " << ROI_xmax << ", " << ROI_ymax << ", " << ROI_zmax << std::endl;
-
+                    */
                     pcl::PointCloud<Cloud_Type>::Ptr ROI_min_max(new pcl::PointCloud<Cloud_Type>);
                     Cloud_Type ROImin, ROImax;
                     //ROImin.x = ROImin_x;
@@ -916,20 +1186,20 @@ int main(int argc, char* argv[]) try
                     ROI_min_max->points.push_back(ROImin);
                     ROI_min_max->points.push_back(ROImax);
 
-                    //renderPointCloud(viewer, ROI_min_max, "ROIminmax" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 1), 10);
+                    renderPointCloud(viewer, ROI_min_max, "ROIminmax" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 1), 10);
 
                     if (filterCloud->points.size() > 50)
                     {
                         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
                         std::pair<typename pcl::PointCloud<Cloud_Type>::Ptr, typename pcl::PointCloud<Cloud_Type>::Ptr> segmentCloud;
-                        segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc / 250, coefficients); // Possible pavement defects //.01//300
+                        segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 500, pixel_distance_in_meters_cc / 175, coefficients); // Possible pavement defects //.01//300//default is 250//best is 200//175 is better than 200
                         //segmentCloud = pointProcessorI->SegmentPlane(filterCloud, 5000, 0.01, coefficients); // Possible pavement defects //.01
 
                         std::cerr << "Model coefficients: " << coefficients->values[0] << " "
                             << coefficients->values[1] << " "
                             << coefficients->values[2] << " "
                             << coefficients->values[3] << std::endl;
-                        if (stoi(argv[14]))
+                        if (stoi(argv[14]) && (classes[bBox.classID] == "Potholes"))
                         {
                             renderPointCloud(viewer, filterCloud, "filterCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(1, 0, 1));
                             renderPointCloud(viewer, segmentCloud.second, "planeCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 0));
@@ -1041,7 +1311,7 @@ int main(int argc, char* argv[]) try
                                                     depth_contour_Cloud->points.push_back(point);
                                             }
 
-                                            //if (stoi(argv[14])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
+                                            if (stoi(argv[14])) renderPointCloud(viewer, depth_contour_Cloud, "depthContour" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4) + zero_padding(std::to_string(j), 4), Color(get<0>(RGB_Color), get<1>(RGB_Color), get<2>(RGB_Color)));
                                             /*
                                             std::cout << "Contour size is: " << depth_contour_Cloud->points.size() << std::endl;
                                             //std::cout << "Colors: " << get<0>(RGB_Color) <<", " << get<1>(RGB_Color) << ", " << get<2>(RGB_Color) << std::endl;
@@ -1097,50 +1367,6 @@ int main(int argc, char* argv[]) try
                                     std::cout << "Negative volume is: " << neg_volume << " (" << 1000 * neg_volume << " litres)." << std::endl;
 
                                     //std::vector<std::array<float[2]>> rbg_hull;
-                                    for (Cloud_Type p_hull : cloud_hull->points)
-                                    {
-                                        float pixel[2];
-                                        float point[3] = { p_hull.x, p_hull.y, p_hull.z };
-                                        //std::cout << point[0] << ", " << point[1] << ", " << point[2] <<" : "<< p_hull.x<<", "<< p_hull.y<<", "<< p_hull.z <<std::endl;
-                                        float point_color[3];
-                                        rs2_transform_point_to_point(point_color, &depth_extrin_to_color, point);
-                                        rs2_project_point_to_pixel(pixel, &color_intrin, point_color);
-                                        //rs2_project_point_to_pixel(pixel, &color_intrin, point);
-                                        //rbg_hull.push_back(pixel);
-                                        //cv::circle(imageRGB, Point(pixel[0], pixel[1]), 0, Scalar(255, 0, 0),-1,8,0);
-                                        cv::circle(rgb_out, Point(pixel[0], pixel[1]), 0, Scalar(255, 0, 0), 6, 8, 0);
-                                        //std::cout << pixel[0] << ", " << pixel[1] << std::endl;
-                                        //std::cout << "tl_depth: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << ", " << std::endl;
-
-                                    }
-                                    for (Cloud_Type p_max_depth : max_depth_Cloud->points)
-                                    {
-                                        float pixel[2];
-                                        float point[3] = { p_max_depth.x, p_max_depth.y, p_max_depth.z };
-                                        //std::cout << point[0] << ", " << point[1] << ", " << point[2] <<" : "<< p_hull.x<<", "<< p_hull.y<<", "<< p_hull.z <<std::endl;
-                                        float point_color[3];
-                                        rs2_transform_point_to_point(point_color, &depth_extrin_to_color, point);
-                                        rs2_project_point_to_pixel(pixel, &color_intrin, point_color);
-                                        //rs2_project_point_to_pixel(pixel, &color_intrin, point);
-                                        //rbg_hull.push_back(pixel);
-                                        //cv::circle(imageRGB, Point(pixel[0], pixel[1]), 0, Scalar(255, 0, 0),-1,8,0);
-                                        cv::circle(rgb_out, Point(pixel[0], pixel[1]), 0, Scalar(0, 0, 255), 6, 8, 0);
-                                        //std::cout << pixel[0] << ", " << pixel[1] << std::endl;
-                                        //std::cout << "tl_depth: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << ", " << std::endl;
-
-                                    }
-
-                                    if (bVis)
-                                    {
-                                        namedWindow(depth_frame, WINDOW_NORMAL);
-                                        cv::namedWindow("RGB_out", cv::WINDOW_NORMAL);
-                                        imshow(depth_frame, image);
-                                        cv::imshow("RGB_out", rgb_out);
-                                    }
-
-                                    //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
-                                    //imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
-                                    imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(counter), 5) + "_bkprj" + ".jpg", rgb_out);
 
                                     //}
                                     //if(render_box)
@@ -1267,13 +1493,58 @@ int main(int argc, char* argv[]) try
                                         renderPointCloud(viewer, pca_end_points_z_out, "pca_end_points_z" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 10);
                                         renderPointCloud(viewer, pca_end_points_y_out, "pca_end_points_y" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 0, 0), 10);
                                         //renderPointCloud(viewer, pca_end_points_x_out, "pca_end_points_x" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(1, 1, 1), 10);
-                                        renderPointCloud(viewer, cluster_pts_prmry_pca_axis_1, "cluster_pts_prmry_pca_axis_1" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
-                                        renderPointCloud(viewer, cluster_pts_prmry_pca_axis_2, "cluster_pts_prmry_pca_axis_2" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
+                                        //enderPointCloud(viewer, cluster_pts_prmry_pca_axis_1, "cluster_pts_prmry_pca_axis_1" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
+                                        //renderPointCloud(viewer, cluster_pts_prmry_pca_axis_2, "cluster_pts_prmry_pca_axis_2" + zero_padding(std::to_string(bBox.boxID), 3) + zero_padding(std::to_string(clusterId), 4), Color(0, 0, 1), 4);
                                     }
 
 
                                     if (classes[bBox.classID] == "Potholes" && rounded_min < 0)
                                     {
+                                        for (Cloud_Type p_hull : cloud_hull->points)
+                                        {
+                                            float pixel[2];
+                                            float point[3] = { p_hull.x, p_hull.y, p_hull.z };
+                                            //std::cout << point[0] << ", " << point[1] << ", " << point[2] <<" : "<< p_hull.x<<", "<< p_hull.y<<", "<< p_hull.z <<std::endl;
+                                            float point_color[3];
+                                            rs2_transform_point_to_point(point_color, &depth_extrin_to_color, point);
+                                            rs2_project_point_to_pixel(pixel, &color_intrin, point_color);
+                                            //rs2_project_point_to_pixel(pixel, &color_intrin, point);
+                                            //rbg_hull.push_back(pixel);
+                                            //cv::circle(imageRGB, Point(pixel[0], pixel[1]), 0, Scalar(255, 0, 0),-1,8,0);
+                                            cv::circle(rgb_out, Point(pixel[0], pixel[1]), 0, Scalar(255, 0, 0), 6, 8, 0);
+                                            //std::cout << pixel[0] << ", " << pixel[1] << std::endl;
+                                            //std::cout << "tl_depth: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << ", " << std::endl;
+
+                                        }
+                                        for (Cloud_Type p_max_depth : max_depth_Cloud->points)
+                                        {
+                                            float pixel[2];
+                                            float point[3] = { p_max_depth.x, p_max_depth.y, p_max_depth.z };
+                                            //std::cout << point[0] << ", " << point[1] << ", " << point[2] <<" : "<< p_hull.x<<", "<< p_hull.y<<", "<< p_hull.z <<std::endl;
+                                            float point_color[3];
+                                            rs2_transform_point_to_point(point_color, &depth_extrin_to_color, point);
+                                            rs2_project_point_to_pixel(pixel, &color_intrin, point_color);
+                                            //rs2_project_point_to_pixel(pixel, &color_intrin, point);
+                                            //rbg_hull.push_back(pixel);
+                                            //cv::circle(imageRGB, Point(pixel[0], pixel[1]), 0, Scalar(255, 0, 0),-1,8,0);
+                                            cv::circle(rgb_out, Point(pixel[0], pixel[1]), 0, Scalar(0, 0, 255), 6, 8, 0);
+                                            //std::cout << pixel[0] << ", " << pixel[1] << std::endl;
+                                            //std::cout << "tl_depth: " << Point3d_tl_depth[0] << ", " << Point3d_tl_depth[1] << ", " << Point3d_tl_depth[2] << ", " << std::endl;
+
+                                        }
+
+                                        if (bVis)
+                                        {
+                                            //namedWindow(depth_frame, WINDOW_NORMAL);
+                                            //imshow(depth_frame, image);
+                                            cv::namedWindow("RGB_out", cv::WINDOW_NORMAL);
+                                            cv::imshow("RGB_out", rgb_out);
+                                        }
+
+                                        //imwrite("C:/Users/hedey/source/repos/Road_Defects_Detector/RGB_images/" + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                        //imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(f), 5) + "_bkprj" + ".jpg", rgb_out);
+                                        imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(counter), 5) + "_bkprj" + ".jpg", rgb_out);
+
                                         std::cout << "**************************************" << std::endl;
                                         std::cout << "Pothole attributes:" << std::endl;
                                         std::cout << "-------------------" << std::endl;
@@ -1282,6 +1553,12 @@ int main(int argc, char* argv[]) try
                                         float avg_diameter_mm = abs(floor(0.5 * (distance_z + distance_y) * 1000.0 + .5));
                                         std::cout << "Average Pothole's Diameter is: " << avg_diameter_mm << " mm." << std::endl;
                                         std::cout << "Pothole's Area is: " << concave_hull_area << " m2." << std::endl;
+                                        event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)][to_string(clusterId)]["dist_to_cc"] = pixel_distance_in_meters_cc;
+                                        event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)][to_string(clusterId)]["max_depth_mm"] = abs(rounded_min);
+                                        event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)][to_string(clusterId)]["avg_diam_mm"] = avg_diameter_mm;
+                                        event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)][to_string(clusterId)]["Area"] = concave_hull_area;
+                                        event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)][to_string(clusterId)]["height"] = bBox.roi.height;
+
                                         float pothole_count = 0.0;
                                         string svrty;
                                         if ((abs(rounded_min) > 13) && (abs(rounded_min) <= 25))
@@ -1356,6 +1633,7 @@ int main(int argc, char* argv[]) try
                                         std::cout << "Pothole's severity is: " << svrty << std::endl;
                                         std::cout << "Pothole's equivalent count is: " << pothole_count << " (" << floor(pothole_count + .5) << " potholes)." << std::endl;
                                         std::cout << "Pothole's volume (under plane only) is: " << abs(neg_volume) << " m3 (" << 1000 * abs(neg_volume) << " litres)." << std::endl;
+                                        event[to_string(counter)]["bBoxes"][to_string(bBox.boxID)][to_string(clusterId)]["volume"] = abs(neg_volume);
                                         std::cout << "**************************************" << std::endl;
                                     }
                                     bBox.cClusters.push_back(cc);
@@ -1364,9 +1642,188 @@ int main(int argc, char* argv[]) try
 
                                 }
                             }//
+                            else
+                            {
+                                //cv::imshow("unet_out", unet_out);
+                                pcl::PointCloud<Cloud_Type>::Ptr crack_Cloud(new pcl::PointCloud<Cloud_Type>);
+                                pcl::PointCloud<Cloud_Type>::Ptr crack_Cloud2(new pcl::PointCloud<Cloud_Type>);
+                                
+                                /*cv::Mat resultImg_bbx(448, 448, CV_8U);*/
+                                /*unet_forward(imageRGB_pc(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), resultImg_bbx);*/
+                                /*imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(counter), 5) + zero_padding(std::to_string(bBox.boxID), 2) + "_unet" + ".jpg", resultImg_bbx);*/
+
+                                //int x = resultImg.at<uchar>(640, 360);//getting the pixel values//
+                                //std::cout << x << std::endl;
+
+                                //cv::Mat unet_out = imageRGB_pc.clone();
+                                
+                                //for (int i = 0; i < resultImg_bbx.rows; ++i)
+                                //std::cout << "pixel mean: " << mat_mean(resultImg(cv::Rect(x_tl, y_tl, x_br-x_tl, y_br-y_tl)));
+                                int ef_threshold = mat_percentile(resultImg(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), 0.85);//0.97
+                                int max_threshold = mat_percentile(resultImg(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), 0.999);//0.97
+                                int pix_threshold;
+                                int low_thre = pix_threshold = mat_percentile(resultImg(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), 0.8);
+                                int up_thre = pix_threshold = mat_percentile(resultImg(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), 0.95);
+                                if (ef_threshold < 90)
+                                    pix_threshold = up_thre;
+                                else
+                                    pix_threshold = low_thre;
+                                //std::cout << std::endl <<"#1 pix threshold: " << pix_threshold <<", thresholding at:" << pix_threshold + 2 * pix_threshold / 255.0 << std::endl;
+                                std::cout << std::endl << "#1 pix threshold: " << ef_threshold << ", max pix:" << max_threshold <<", low: "<< low_thre<<", up: "<< up_thre << std::endl;
+                                //float max_dist = max(pixel_distance_in_meters_tl, pixel_distance_in_meters_tr);
+                                float max_dist = pixel_distance_in_meters_cc;
+                                std::cout << "max dist: " << max_dist << std::endl<< std::endl;
+                                /*
+                                int up_thre = mat_percentile(resultImg(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), 0.95);//0.97;
+                                int low_thre = mat_percentile(resultImg(cv::Rect(x_tl, y_tl, x_br - x_tl, y_br - y_tl)), 0.8);//0.97;
+                                std::cout << "low thre: " << low_thre << ", up thre: " << up_thre << std::endl;
+                                */
+                                int dist = 0;
+                                for (int i = y_tl; i <= y_br; ++i)
+                                {
+                                    //for (int j = 0; j < resultImg_bbx.cols; ++j)
+                                    for (int j = x_tl; j < x_br; ++j)
+                                    {
+                                        //std::cout << j <<", "<<i << std::endl;
+                                        //std::cout << mask.at<cv::Vec3b>(i, j)[0]<<", "<< mask.at<cv::Vec3b>(i, j)[1]<<", "<< mask.at<cv::Vec3b>(i, j)[2] << std::endl;
+                                        int pix = resultImg.at<uchar>(i, j);
+                                        /*float pixel_distance_in_meters = depth.get_distance(j + x_tl, i + y_tl);*/
+                                        float pixel_distance_in_meters = depth.get_distance(j, i);
+                                        /*
+                                        int pix_threshold;
+                                        if (pixel_distance_in_meters > 0.5)
+                                            pix_threshold = up_thre;
+                                        else
+                                            pix_threshold = low_thre;
+
+                                        dist += pixel_distance_in_meters;
+                                        */
+                                        //if (pix >= pix_threshold+ 2*pix_threshold/255.0) //Best 8/16/22
+                                        //if (pix >= pix_threshold  + 2* pixel_distance_in_meters*pix_threshold/255.0) //Best 8/16/22
+                                        //if (pix >= pix_threshold + 2 * pixel_distance_in_meters * pix_threshold / max_dist) //10/8/22
+                                        //if (pix >= pixel_distance_in_meters* pixel_distance_in_meters * pix_threshold / max_dist)
+                                        //if (pix >= pix_threshold* pixel_distance_in_meters)
+                                        //if (pix >= pix_threshold* pixel_distance_in_meters* pixel_distance_in_meters / max_dist)
+                                        if (pix >= max_threshold*.7* pixel_distance_in_meters/ pixel_distance_in_meters_cc)
+                                        //if (pix >= pix_threshold * pixel_distance_in_meters / (ROI_xmax - ROI_xmin))
+                                        //if (pix >= pix_threshold * pixel_distance_in_meters /ROI_xmax)
+                                        //if (pix >= 200* pixel_distance_in_meters/ ROI_xmax)
+                                        //if ((mask.at<cv::Vec3b>(i, j)[0] == 255) && (mask.at<cv::Vec3b>(i, j)[1] == 255) && (mask.at<cv::Vec3b>(i, j)[2] == 255))
+                                        {
+                                            float Point3d_p[3];
+                                            float Point3d_depth[3];
+
+                                            /*float pixel[2] = {float(j + x_tl),float(i + y_tl)};*/
+                                            float pixel[2] = { float(j),float(i) };
+
+
+                                            rs2_deproject_pixel_to_point(Point3d_p, &color_intrin, pixel, pixel_distance_in_meters);
+                                            rs2_transform_point_to_point(Point3d_depth, &color_extrin_to_depth, Point3d_p);
+                                            
+                                            Cloud_Type point;
+                                            point.x = Point3d_depth[0], point.y = Point3d_depth[1], point.z = Point3d_depth[2];
+                                            point.r = 1, point.g = 0, point.b = 1;
+                                            crack_Cloud->points.push_back(point);
+                                                                                     
+                                            //std::cout << pix << std::endl;
+                                            /*cv::circle(unet_out, cv::Point(j + x_tl, i + y_tl), 0, cv::Scalar(255, 0, 255), 1, 8, 0);*/
+                                            cv::circle(unet_out, cv::Point(j, i), 0, cv::Scalar(255, 0, 255), 1, 8, 0);
+                                        }
+                                        else if (pix >=100)
+                                        {
+                                            float Point3d_p[3];
+                                            float Point3d_depth[3];
+
+                                            /*float pixel[2] = {float(j + x_tl),float(i + y_tl)};*/
+                                            float pixel[2] = { float(j),float(i) };
+
+
+                                            rs2_deproject_pixel_to_point(Point3d_p, &color_intrin, pixel, pixel_distance_in_meters);
+                                            rs2_transform_point_to_point(Point3d_depth, &color_extrin_to_depth, Point3d_p);
+
+                                            Cloud_Type point;
+                                            point.x = Point3d_depth[0], point.y = Point3d_depth[1], point.z = Point3d_depth[2];
+                                            point.r = 1, point.g = 0, point.b = 1;
+                                            crack_Cloud2->points.push_back(point);
+
+                                            //std::cout << pix << std::endl;
+                                            /*cv::circle(unet_out, cv::Point(j + x_tl, i + y_tl), 0, cv::Scalar(255, 0, 255), 1, 8, 0);*/
+                                            //cv::circle(unet_out, cv::Point(j, i), 0, cv::Scalar(255, 0, 255), 1, 8, 0);
+
+                                        }
+                                        else
+                                        {
+                                            //std::cout << pix_threshold << ", " << pix << ", " << pixel_distance_in_meters << std::endl;
+                                        }
+
+                                    }
+
+                                }
+                                //std::cout << "Crack point cloud size is: " << crack_Cloud->size() << std::endl;
+                                //std::cout << "avg. dist: " << dist / crack_Cloud->size() << std::endl;
+                                //renderPointCloud(viewer, crack_Cloud, "crack" + zero_padding(std::to_string(bBox.boxID), 3), Color(1,1,1), 4);
+                                //renderPointCloud(viewer, filterCloud, "filterCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(1, 0, 1));
+                                //renderPointCloud(viewer, segmentCloud.second, "planeCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 0));
+
+                                //renderPointCloud(viewer, crack_Cloud2, "crackCloud2" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 0, 1), 2);
+                                renderPointCloud(viewer, crack_Cloud, "crackCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(1, 0, 1), 2);
+
+                                pcl::ModelCoefficients::Ptr crackPlaneCoefficients(new pcl::ModelCoefficients);
+                                std::pair<typename pcl::PointCloud<Cloud_Type>::Ptr, typename pcl::PointCloud<Cloud_Type>::Ptr> crackSegmentCloud;
+                                //crackSegmentCloud = pointProcessorI->SegmentPlane(crack_Cloud, 500, 0.005, crackPlaneCoefficients);
+                                /*
+                                std::cerr << "Model coefficients: " << crackPlaneCoefficients->values[0] << " "
+                                    << crackPlaneCoefficients->values[1] << " "
+                                    << crackPlaneCoefficients->values[2] << " "
+                                    << crackPlaneCoefficients->values[3] << std::endl;
+                                */
+                                if (stoi(argv[14]))
+                                {
+                                    //renderPointCloud(viewer, crackSegmentCloud.first, "crackTrueCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 0, 1));
+                                    //renderPointCloud(viewer, crackSegmentCloud.second, "crackPlaneCloud" + zero_padding(std::to_string(bBox.boxID), 3), Color(0, 1, 0));
+                                }
+
+                                cv::imshow("unet_out_2", unet_out);
+
+                            }
                         }
                     }
                 }
+                /*
+                else if ((classes[bBox.classID] == "Transverse Crack") || (classes[bBox.classID] == "Block Crack") || (classes[bBox.classID] == "Longitudinal Crack") || (classes[bBox.classID] =="Aligator Crack") || (classes[bBox.classID] == "Sealed Reflective Crack") || (classes[bBox.classID] == "Sealed Longitudinal Crack"))
+                {
+                //cv::imshow("unet_out", unet_out);
+                cv::Mat resultImg_bbx(448, 448, CV_8U);
+                    unet_forward(imageRGB_pc(cv::Rect(x_tl, y_tl, x_br-x_tl, y_br-y_tl)), resultImg_bbx);
+                    imwrite(string(argv[6]) + string(argv[9]) + zero_padding(std::to_string(counter), 5) + zero_padding(std::to_string(bBox.boxID) , 2)+ "_unet" + ".jpg", resultImg_bbx);
+
+                    //int x = resultImg.at<uchar>(640, 360);//getting the pixel values//
+                    //std::cout << x << std::endl;
+                
+                    //cv::Mat unet_out = imageRGB_pc.clone();
+
+                    for (int i = 0; i < resultImg_bbx.rows; ++i)
+                    {
+                        for (int j = 0; j < resultImg_bbx.cols; ++j)
+                        {
+                            //std::cout << j <<", "<<i << std::endl;
+                            //std::cout << mask.at<cv::Vec3b>(i, j)[0]<<", "<< mask.at<cv::Vec3b>(i, j)[1]<<", "<< mask.at<cv::Vec3b>(i, j)[2] << std::endl;
+                            int pix = resultImg_bbx.at<uchar>(i, j);
+                            if (pix >= 30)
+                                //if ((mask.at<cv::Vec3b>(i, j)[0] == 255) && (mask.at<cv::Vec3b>(i, j)[1] == 255) && (mask.at<cv::Vec3b>(i, j)[2] == 255))
+                            {
+                                //std::cout << pix << std::endl;
+                                cv::circle(unet_out, cv::Point(j+x_tl, i+y_tl), 0, cv::Scalar(255, 0, 255), 1, 8, 0);
+                            }
+
+                        }
+                
+                    }
+
+                    cv::imshow("unet_out_2", unet_out);
+                
+                }
+                */
                 else
                 {
                     ROI_xmin = std::max(std::min(Point3d_bl_depth[0], Point3d_tl_depth[0]), minPt.x);
@@ -1392,7 +1849,7 @@ int main(int argc, char* argv[]) try
         std::cout << "Counter: " << counter << ", Total frames (est., excluding frame drops): "<< frame_count << std::endl;
 
         
-        if ((curPos < lastPos) || (not bFrame))
+        if ((curPos < lastPos) || (! bFrame))
         {
             break;
         }

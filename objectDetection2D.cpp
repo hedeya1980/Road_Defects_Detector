@@ -79,7 +79,7 @@ void draw_yolo_bb(cv::Mat& img, int c, float x, float y, float w, float h, vecto
     //cv::namedWindow( windowName, 1 );
     cv::namedWindow(windowName, cv::WINDOW_NORMAL);
     cv::imshow(windowName, visImg);
-    cv::waitKey(0); // wait for key to be pressed
+    //cv::waitKey(0); // wait for key to be pressed
 
 }
 

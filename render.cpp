@@ -64,7 +64,7 @@ void renderPointCloud(pcl::visualization::PCLVisualizer::Ptr& viewer, const pcl:
 	// Select color based off input value
 	pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(cloud);
 	viewer->addPointCloud<pcl::PointXYZRGB>(cloud, rgb, name);
-	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, name);
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, name);
 }
 
 
