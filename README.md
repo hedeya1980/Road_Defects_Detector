@@ -45,3 +45,13 @@ d.	The pothole’s volume is estimated using the pothole’s area as well and di
 3.	The segmented plane is illustrated in green color, the potholes are illustrated in yellow color, and the clusters that are higher than the plane are illustrated in light blue color.
 4.	Although we used the metric units to record our pothole measurements, it’s worth mentioning that the units resulting from COLMAP are arbitrary units. So, the achieved measurements may need to be rescaled using objects from the scene with well known actual measurements (such as cars).
 ![Point Cloud After Processing](https://github.com/hedeya1980/Images/blob/main/processed_scene.png)
+
+# Prototype Installation:
+1. Pls download and extract ![this file](https://drive.google.com/file/d/1AUF5RCf9uhvGzKIf5RreTHtXWKXzxu7j/view?usp=share_link)
+2. Run the Road_Defects_Detector.exe file.
+3. You can navigate through the point cloud and check it closely. You can zoom in, zoom out, tilt the scene to check it from various directions.
+4. You can check the results, and the pothole measurements in the console window.
+5. To the best of our knowledge, we have included all the required .dll files in the folder. However, in case you were alert that any .dll file is missing, pls contact me at mohamed.hedeya@eng.psu.edu.eg, or hedeya1980@gmail.com
+6. The folder included the fused.py point cloud file as well. It's available at:  as well.
+
+
