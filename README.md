@@ -57,8 +57,12 @@ d.	The pothole’s volume is estimated using the pothole’s area as well and di
 
 # Pothole Monocular Depth Estimation
 * We used the algorithm of "Global-Local Path Networks for Monocular Depth Estimation with Vertical CutDepth" as base for pothole depth estimation.
-* The algorithm could be used to estimate the depth frame for the detected potholes.
 * We apply the algorithm on sample of the potholes taken from the challange videos. 
 * This [Colab Notebook](https://colab.research.google.com/drive/1183Ak-zCc88ZlOVf--ou4XXgDIL5bC5Y?usp=share_link) explains how we could use the algorithm to estimate the depth.
+* The results shows that the Monocular Depth Estimation algorithms could be used to estimate the depth of the detected potholes with good accurcy and performance.
+![Pothole Depth Estimation](https://raw.githubusercontent.com/emad-elsayed/Images/main/Pothole%20Depth%20Estimation.png)
+* The results could be enhanced by training these algorithms with similar datasets of roads and potholes.
+![Pothole Depth Estimation Results](https://raw.githubusercontent.com/emad-elsayed/Images/main/Potholes%20Depth%20Estimation%20Results.png)
+
 
 
