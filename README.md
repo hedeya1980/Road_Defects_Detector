@@ -55,3 +55,10 @@ d.	The pothole’s volume is estimated using the pothole’s area as well and di
 6. The folder included the fused.py point cloud file as well. It's available at: https://drive.google.com/file/d/1AVOHJNRVBm4HLQinKTZN5TNs1czP9s_l/view?usp=share_link as well.
 
 
+# Pothole Monocular Depth Estimation
+* We used the algorithm of "Global-Local Path Networks for Monocular Depth Estimation with Vertical CutDepth" as base for pothole depth estimation.
+* The algorithm could be used to estimate the depth frame for the detected potholes.
+* We apply the algorithm on sample of the potholes taken from the challange videos. 
+* This ![Colab Notebook](https://colab.research.google.com/drive/1183Ak-zCc88ZlOVf--ou4XXgDIL5bC5Y?usp=share_link) explains how we could use the algorithm to estimate the depth.
+
+
