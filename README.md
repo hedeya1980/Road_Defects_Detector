@@ -52,6 +52,6 @@ d.	The pothole’s volume is estimated using the pothole’s area as well and di
 3. You can navigate through the point cloud and check it closely. You can zoom in, zoom out, tilt the scene to check it from various directions.
 4. You can check the results, and the pothole measurements in the console window.
 5. To the best of our knowledge, we have included all the required .dll files in the folder. However, in case you were alert that any .dll file is missing, pls contact me at mohamed.hedeya@eng.psu.edu.eg, or hedeya1980@gmail.com
-6. The folder included the fused.py point cloud file as well. It's available at:  as well.
+6. The folder included the fused.py point cloud file as well. It's available at: https://drive.google.com/file/d/1AVOHJNRVBm4HLQinKTZN5TNs1czP9s_l/view?usp=share_link as well.
 
 
