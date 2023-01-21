@@ -55,6 +55,16 @@ d.	The pothole’s volume is estimated using the pothole’s area as well and di
 6. The folder included the fused.py point cloud file as well. It's available at: https://drive.google.com/file/d/1AVOHJNRVBm4HLQinKTZN5TNs1czP9s_l/view?usp=share_link as well.
 
 
+# Pothole 3D Reconstruction from Successive Video Frames
+* First, a sparse 3D reconstruction between few successive video frames is performed. This sparse reconstruction is typically dominated by features from large textured objects such as buildings and vehicles. Once enough objects are captured in this reconstruction, the scale ambiguity can be estimated with the help of the typical dimensions of the reconstructed objects such as vehicles and this help model the vehicle speed (displacement between frames) using the optical flow vectors in the ground area at the lower area of the video frames.
+
+* Since the potholes are the main target for reconstruction, a dense matching step is conducted between the lower halves (mainly ground area) of each two successive video frames. This step includes detection and matching of interest points (SURF has been used in our implementation), estimating the transformation between frames using RANdom Sampling and Consensus (RANSAC), image rectification and finally Semi Global Matching (SGM) to obtain a disparity map between the frames. The disparity map is processed to interpolate empty areas and to filter out outliers. The ground area surface/depth is estimated using the estimated displacement and the disparity map between frames. The areas below the fitted plane of main surface are detected as potholes and geometrical characteristics of these potholes and their severity are measured using the estimated 3D surface. The detected potholes using deep learning applied on the video frames are also projected into the reconstructed surface for verification and for calculating 3D measurements and severity.
+
+* We implement a prototype for this methodology using Matlab
+* The Matlab code could be used downloaded from [this folder](https://drive.google.com/drive/folders/1YZ75HNhuJd4ewAW3xJ8ZBN8JDMbvMS7v?usp=share_link) 
+* The methodology shows very promising results in 3D reconstruction of the detected potholes
+![Pothole 3D Reconstruction from Successive Video Frames](https://raw.githubusercontent.com/emad-elsayed/Images/main/Pothole%203D%20Reconstruction.png) 
+
 # Pothole Monocular Depth Estimation
 * We used the algorithm of "Global-Local Path Networks for Monocular Depth Estimation with Vertical CutDepth" as base for pothole depth estimation.
 * We apply the algorithm on sample of the potholes taken from the challange videos. 
