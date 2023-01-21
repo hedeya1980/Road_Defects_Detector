@@ -19,5 +19,5 @@
 *	COLMAP is a general-purpose Structure-from-Motion (SfM) and Multi-View Stereo (MVS) pipeline with a graphical and command-line interface. It offers a wide range of features for reconstruction of ordered and unordered image collections.
 *	Due to the competition timing constraints, we applied it to Scene 2 frames from frame# 279 to frame# 412.
 *	The results of Scene reconstruction were impressive as shown in the following figure for the resulting fused Point Cloud.
-![alt text](https://drive.google.com/file/d/1ATqgaQadmv0iFXQASlIErxoM1_xMVaji/view?usp=share_link)
+![Fused Point Cloud](https://drive.google.com/file/d/1ATqgaQadmv0iFXQASlIErxoM1_xMVaji/view?usp=share_link/scene.png)
 
