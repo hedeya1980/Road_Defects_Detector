@@ -490,6 +490,20 @@ typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::loadPcd(std::s
     return cloud;
 }
 
+template<typename PointT>
+typename pcl::PointCloud<PointT>::Ptr ProcessPointClouds<PointT>::loadPly(std::string file)
+{
+
+    typename pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
+
+    if (pcl::io::loadPLYFile<PointT>(file, *cloud) == -1) //* load the file
+    {
+        PCL_ERROR("Couldn't read file \n");
+    }
+    std::cerr << "Loaded " << cloud->points.size() << " data points from " + file << std::endl;
+
+    return cloud;
+}
 
 
 template<typename PointT>

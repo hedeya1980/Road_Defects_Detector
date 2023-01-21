@@ -4,6 +4,7 @@
 #define PROCESSPOINTCLOUDS_H_
 
 #include <pcl/io/pcd_io.h>
+#include<pcl/io/ply_io.h>
 #include <pcl/common/common.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
@@ -64,6 +65,8 @@ public:
     void saveBin(typename pcl::PointCloud<PointT>::Ptr cloud, std::string file);
 
     typename pcl::PointCloud<PointT>::Ptr loadPcd(std::string file);
+    
+    typename pcl::PointCloud<PointT>::Ptr loadPly(std::string file);
 
     std::vector<boost::filesystem::path> streamPcd(std::string dataPath);
   

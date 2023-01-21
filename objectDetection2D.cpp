@@ -206,6 +206,8 @@ void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<Bound
         //cv::Size labelSize = getTextSize(label, cv::FONT_HERSHEY_DUPLEX, 0.75, .75, &baseLine);
         cv::Size labelSize = getTextSize(label, cv::FONT_ITALIC, 0.75, 2, &baseLine);
         top = max(top, labelSize.height);
+        cout << "Box left, top, right, bottom: " << left << ", " << top << ", " << min(left + width, visImg.size().width) << ", " << top + height << endl;
+        cout << "Label size: " << labelSize.width << ", " << labelSize.height << endl;
         //rectangle(visImg, cv::Point(left, top - round(1.5*labelSize.height)), cv::Point(left + round(1.5*labelSize.width), top + baseLine), cv::Scalar(255, 255, 255), cv::FILLED);
         //rectangle(visImg, cv::Point(left, top - round(1.5 * labelSize.height)), cv::Point(left + round(1.5 * labelSize.width), top + baseLine), cv::Scalar(0, 255, 255), cv::FILLED);
             //cv::putText(visImg, label, cv::Point(left, top), cv::FONT_ITALIC, 0.75, cv::Scalar(0,0,0),1);
@@ -224,6 +226,8 @@ void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<Bound
         int label_width = int(min(round(labelSize.width), double(visImg.size().width - left)));
         //cv::Mat roi = visImg(cv::Rect(left, top - round(2.0 * labelSize.height), int(min(round(labelSize.width), double(visImg.size().width - left))), round(2.0 * labelSize.height)));
         cv::Mat roi = visImg(cv::Rect(label_left, label_top, label_width, round(2.0 * labelSize.height)));
+        //cv::Mat roi = visImg(cv::Rect(label_left, label_top, label_width, top+baseLine));
+        cout << "label roi left, top, right, bottom: " << label_left << ", " << label_top << ", " << label_width << ", " << round(2.0 * labelSize.height) << endl;
 
         //cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 255, 255));
         cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(get<1>(RGB_Color), get<2>(RGB_Color), get<0>(RGB_Color)));
@@ -235,6 +239,7 @@ void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<Bound
 
         //cv::putText(visImg, label, cv::Point(left, top), cv::FONT_HERSHEY_DUPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
         //cv::putText(visImg, label, cv::Point(left, top), cv::FONT_HERSHEY_DUPLEX, 0.75, cv::Scalar(0, 0, 0), 0.75);
+        cout << "lable top-left: " << left << ", " << top - round(0.35 * labelSize.height) << endl;
         cv::putText(visImg, label, cv::Point(left, top - round(0.35 * labelSize.height)), cv::FONT_ITALIC, 0.75, cv::Scalar(0, 0, 0), 2);
     }
 
@@ -248,8 +253,10 @@ void detectObjects(int f, cv::Mat& img, std::string save_path, std::vector<Bound
         string windowName = "Object classification";
         //cv::namedWindow( windowName, 1 );
         cv::namedWindow(windowName, cv::WINDOW_NORMAL);
+        //cv::resizeWindow(windowName, 675, 380);
+        //cv::moveWindow(windowName, 800, 0);
         cv::imshow(windowName, visImg);
-        //cv::waitKey(0); // wait for key to be pressed
+        cv::waitKey(0); // wait for key to be pressed
 
         //cv::destroyWindow(windowName);
     }
