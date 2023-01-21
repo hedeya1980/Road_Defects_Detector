@@ -21,3 +21,8 @@
 *	The results of Scene reconstruction were impressive as shown in the following figure for the resulting fused Point Cloud.
 ![Fused Point Cloud](https://drive.google.com/file/d/1ATqgaQadmv0iFXQASlIErxoM1_xMVaji/view?usp=share_link/scene.png)
 
+**Potholes Monocular Depth Estimation:**
+* We used the algorithm of "Global-Local Path Networks for Monocular Depth Estimation with Vertical CutDepth" as a base to estimate the depth of the detected potholes
+* The following google colab notebook shows how the algorithm could be used to estimate the depth
+* https://colab.research.google.com/drive/1183Ak-zCc88ZlOVf--ou4XXgDIL5bC5Y?usp=share_link
+* We took some potholes of the videos as a sample to check the algorithm     
