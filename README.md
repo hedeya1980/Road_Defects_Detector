@@ -28,7 +28,7 @@
 1.	The 2D images are fed into the trained YOLOv7 model.
 2.	The resulting bounding boxes are projected to the 3D point cloud to perform the following operations:
     a.	Filtering the point cloud to the region corresponding to the 2D bounding box.
-    b.	Performing ‘Road Plane Segmentation’ for just the filtered region to decide which points belong to the road, and which ones belong to the pothole.
+    b.   Performing ‘Road Plane Segmentation’ for just the filtered region to decide which points belong to the road, and which ones belong to the pothole.
     c.	Performing ‘Clustering’ for the off-road points, to determine the pothole clusters, and perform the required measurements/calculations.
 3.	We perform the following measurements:
     a.	We measure the Euclidean distance of pothole cluster points to the road plane (obtained in step 2-b above), to determine the maximum pothole depth.
