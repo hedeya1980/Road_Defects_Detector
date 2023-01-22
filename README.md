@@ -38,6 +38,7 @@ d.	The pothole’s volume is estimated using the pothole’s area as well and di
 4.	We follow the following chart to classify Potholes into ‘Low’, ‘Medium’, and ‘High’ in terms of severity, and hence decide which segments of the road need urgent maintenance:
 ![Severity Classification Metrics](https://raw.githubusercontent.com/hedeya1980/Images/main/severity.png)
 5.	The pipeline is illustrated in the following figure:
+
 ![Proposed Pipeline](https://raw.githubusercontent.com/hedeya1980/Images/main/pipeline.png)
 
 ## Prototype:
