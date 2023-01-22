@@ -1,4 +1,5 @@
 # Pothole severity classification via computer vision
+![Demo](https://github.com/hedeya1980/Images/blob/main/SDAIA_scene2_half_shorter.gif)
 ## Pothole Detection:
 *	We trained YOLOv7 model using a ‘Pothole Detection Dataset’.
 *	The dataset consists of images from two different sources (it’s available at https://learnopencv.s3.us-west-2.amazonaws.com/pothole_dataset.zip):
