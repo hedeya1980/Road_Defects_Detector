@@ -3,12 +3,12 @@
 ## Pothole Detection:
 *	We trained YOLOv7 model using a ‘Pothole Detection Dataset’.
 *	The dataset consists of images from two different sources (it’s available at https://learnopencv.s3.us-west-2.amazonaws.com/pothole_dataset.zip):
-  *	The Roboflow pothole detection dataset.
-  *	Pothole dataset that is mentioned in this ResearchGate article – Dataset of images used for pothole detection.
+ *	The Roboflow pothole detection dataset.
+ *	Pothole dataset that is mentioned in this ResearchGate article – Dataset of images used for pothole detection.
 *	After combining, the dataset now contains:
-  *	165 training images
-  *	401 validation images
-  *	118 test images
+ *	165 training images
+ *	401 validation images
+ *	118 test images
 *	We randomly chose 22 frames from the 2 Scenes of the competition dataset, annotated them, and included them in the training data.
 *	We trained for 285 epochs, and achieved 0.671 mAP @0.5 IoU, and 0.38 @ 0.5:0.95 IoU
 *	We run the detections on both of ‘Scene 1’, and ‘Scene 2’ folders, and the detection results can be found at https://drive.google.com/drive/folders/19I0-0FDI5cBLeHJOP8iWvtYYwRHOX2bI?usp=share_link and https://drive.google.com/drive/folders/1hoUwnIYCiV8LJQI_P8_XIJUbnms7B3GK?usp=share_link respectively.
