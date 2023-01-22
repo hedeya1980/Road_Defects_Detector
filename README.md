@@ -51,7 +51,7 @@
 ![log screen shot](https://raw.githubusercontent.com/hedeya1980/Images/main/log.png)
 
 # Prototype Installation:
-1. Pls download and extract ![this file](https://drive.google.com/file/d/1AUF5RCf9uhvGzKIf5RreTHtXWKXzxu7j/view?usp=share_link)
+1. Pls download and extract ![this file](https://drive.google.com/file/d/1AUF5RCf9uhvGzKIf5RreTHtXWKXzxu7j/view?usp=share_link).
 2. Run the Road_Defects_Detector.exe file.
 3. You can navigate through the point cloud and check it closely. You can zoom in, zoom out, tilt the scene to check it from various directions.
 4. You can check the results, and the pothole measurements in the console window.
