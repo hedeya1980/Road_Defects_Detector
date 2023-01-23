@@ -84,6 +84,7 @@ Here is a screenshot for your easy reference:
 
 The above proposed system is based on our experience in a two-year research project that shares the same objective of building a low-cost AI based system for road defects detection and classification. 
 In our original efforts, we have developed an AI system for detection and classification of 13 different road defects, collected and annotated more than 15 hours of highway driving. Our original dataset contains both color and depth images using Intel Realsense D455 camera (a low-cost depth sensor).
+
 Pls refer to our published paper at: https://link.springer.com/chapter/10.1007/978-3-031-03918-8_3
 
 The following videos demonstrate our original system that was built based on the above described pipeline, but with the 3D point clouds generated using the Intel Realsense D455 depth camera instead of 3D reconstruction from pure RGB images:
