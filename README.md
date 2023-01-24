@@ -47,8 +47,7 @@
 3.	The segmented plane is illustrated in green color, the potholes are illustrated in yellow color, and the clusters that are higher than the plane are illustrated in light blue color.
 4.	Although we used the metric units to record our pothole measurements, it’s worth mentioning that the units resulting from COLMAP are arbitrary units. So, the achieved measurements may need to be rescaled using objects from the scene with well known actual measurements (such as cars).
 ![Point Cloud After Processing](https://github.com/hedeya1980/Images/blob/main/processed_scene.png)
-5.	Here is a link the resulting log: https://drive.google.com/file/d/1AWIIb6z22AqvqQrPiUIcTQbhbq2EiB6D/view?usp=share_link
-6.	Here is a screenshot for your easy reference:
+5.	Here is a link the resulting log: https://drive.google.com/file/d/1AWIIb6z22AqvqQrPiUIcTQbhbq2EiB6D/view?usp=share_link, and here is a screenshot for your easy reference:
 ![log screenshot](https://raw.githubusercontent.com/hedeya1980/Images/main/log2.png)
 
 # Prototype Installation:
