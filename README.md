@@ -26,7 +26,7 @@
 
 ## Proposed Pipeline:
 1.	The 2D images are fed into the trained YOLOv7 model.
-2.	The resulting bounding boxes are projected to the 3D point cloud to perform the following operations (*COLMAP 3D reconstruction provides both the intrinsic and extrinsic parameters that are needed to perform the projection from the 2D pixels into the 3D point cloud*):
+2.	The resulting bounding boxes are projected to the 3D point cloud to perform the following operations (<span style="color:blue">*COLMAP 3D reconstruction provides both the intrinsic and extrinsic parameters that are needed to perform the projection from the 2D pixels into the 3D point cloud*</span>):
     1. Filtering the point cloud to the region corresponding to the 2D bounding box.
     2. Performing ‘Road Plane Segmentation’ for just the filtered region to decide which points belong to the road, and which ones belong to the pothole.
     3. Performing ‘Clustering’ for the off-road points, to determine the pothole clusters, and perform the required measurements/calculations.
