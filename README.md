@@ -59,6 +59,7 @@ Here is a screenshot for your easy reference:
 5. To the best of our knowledge, we have included all the required .dll files in the folder. However, in case you were alert that any .dll file is missing, pls contact me at mohamed.hedeya@eng.psu.edu.eg, or hedeya1980@gmail.com
 6. The folder included the fused.py point cloud file as well. It's available at: https://drive.google.com/file/d/1AVOHJNRVBm4HLQinKTZN5TNs1czP9s_l/view?usp=share_link as well.
 7. Here is a link the resulting log: https://drive.google.com/file/d/1AWIIb6z22AqvqQrPiUIcTQbhbq2EiB6D/view?usp=share_link
+8. Please download the demo from [this link](https://github.com/hedeya1980/Images/raw/main/SDAIA_scene2_half_shorter.gif)
 
 # Pothole 3D Reconstruction from Successive Video Frames
 * First, a sparse 3D reconstruction between few successive video frames is performed. This sparse reconstruction is typically dominated by features from large textured objects such as buildings and vehicles. Once enough objects are captured in this reconstruction, the scale ambiguity can be estimated with the help of the typical dimensions of the reconstructed objects such as vehicles and this help model the vehicle speed (displacement between frames) using the optical flow vectors in the ground area at the lower area of the video frames.
