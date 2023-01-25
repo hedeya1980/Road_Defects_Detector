@@ -85,7 +85,7 @@
 The above proposed system is based on our experience in a two-year research project that shares the same objective of building a low-cost AI based system for road defects detection and classification.
 In our original efforts, we have developed an AI system for the detection and classification of 13 different road defects, collected and annotated more than 15 hours of highway driving. Our original dataset contains both color and depth images using Intel Realsense D455 camera (a low-cost depth sensor).
 
-Pls refer to our published paper at: https://link.springer.com/chapter/10.1007/978-3-031-03918-8_3
+Pls refer to our published paper at: https://link.springer.com/chapter/10.1007/978-3-031-03918-8_3 [[1]](#1)
 
 The following videos demonstrate our original system that was built based on the above described pipeline, but with the 3D point clouds generated using the Intel Realsense D455 depth camera instead of 3D reconstruction from pure RGB images:
 
@@ -94,3 +94,14 @@ The following videos demonstrate our original system that was built based on the
 
 * **Example 2:**
 ![PH5](https://github.com/hedeya1980/Images/blob/main/PH5.gif)
+
+## References
+<a id="1">[1]</a> 
+@inproceedings{hedeya2022low,
+  title={A Low-Cost Multi-sensor Deep Learning System for Pavement Distress Detection and Severity Classification},
+  author={Hedeya, Mohamed A and Samir, Eslam and El-Sayed, Emad and El-Sharkawy, Ahmed A and Abdel-Kader, Mohamed F and Moussa, Adel and Abdel-Kader, Rehab F},
+  booktitle={International Conference on Advanced Machine Learning Technologies and Applications},
+  pages={21--33},
+  year={2022},
+  organization={Springer}
+}
