@@ -96,4 +96,4 @@ The following videos demonstrate our original system that was built based on the
 ![PH5](https://github.com/hedeya1980/Images/blob/main/PH5.gif)
 
 ## References
-<a id="1">[1] Hedeya, Mohamed A., et al. "A Low-Cost Multi-sensor Deep Learning System for Pavement Distress Detection and Severity Classification." International Conference on Advanced Machine Learning Technologies and Applications. Springer, Cham, 2022.</a>
+<a id="1">[1] Hedeya, M. A., Samir, E., El-Sayed, E., El-Sharkawy, A. A., Abdel-Kader, M. F., Moussa, A., & Abdel-Kader, R. F. (2022). A Low-Cost Multi-sensor Deep Learning System for Pavement Distress Detection and Severity Classification. Lecture Notes on Data Engineering and Communications Technologies, 113, 21–33. https://doi.org/10.1007/978-3-031-03918-8_3</a>
