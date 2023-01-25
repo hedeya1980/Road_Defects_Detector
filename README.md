@@ -96,11 +96,25 @@ The following videos demonstrate our original system that was built based on the
 ![PH5](https://github.com/hedeya1980/Images/blob/main/PH5.gif)
 
 ## References
-@inproceedings{hedeya2022low,
-  title={A Low-Cost Multi-sensor Deep Learning System for Pavement Distress Detection and Severity Classification},
-  author={Hedeya, Mohamed A and Samir, Eslam and El-Sayed, Emad and El-Sharkawy, Ahmed A and Abdel-Kader, Mohamed F and Moussa, Adel and Abdel-Kader, Rehab F},
-  booktitle={International Conference on Advanced Machine Learning Technologies and Applications},
-  pages={21--33},
-  year={2022},
-  organization={Springer}
+@InProceedings{10.1007/978-3-031-03918-8_3,
+author="Hedeya, Mohamed A.
+and Samir, Eslam
+and El-Sayed, Emad
+and El-Sharkawy, Ahmed A.
+and Abdel-Kader, Mohamed F.
+and Moussa, Adel
+and Abdel-Kader, Rehab F.",
+editor="Hassanien, Aboul Ella
+and Rizk, Rawya Y.
+and Sn{\'a}{\v{s}}el, V{\'a}clav
+and Abdel-Kader, Rehab F.",
+title="A Low-Cost Multi-sensor Deep Learning System for Pavement Distress Detection and Severity Classification",
+booktitle="The 8th International Conference on Advanced Machine Learning and Technologies and Applications (AMLTA2022)",
+year="2022",
+publisher="Springer International Publishing",
+address="Cham",
+pages="21--33",
+abstract="Recent development in the transportation industry enforced the focus on timely pavement inspection and maintenance to preserve a sustainable transportation network. Manual pavement-distress detection systems are time-consuming, costly, and heavily dependent on the subjectivity and experience of the designated inspector. To overcome these challenges, computer vision algorithms incorporating machine learning models have been proposed as an alternative to conventional surveying techniques. This necessitates the need for accurate automated surveying systems capable of rapid data acquisition and efficient algorithms for pavement-distress detection and severity quantification. This paper presents a low-cost multi-sensor solution for the automatic detection and severity classification of pavement distress. The proposed system utilizes a sensor fusion strategy that combines RGB image data and depth information. A convolutional neural network (CNN) is trained to detect and classify 13 of the most common types of pavement distresses. The extracted distress regions of interest (ROI) are projected onto the 3D point cloud data where class-specific point-cloud processing is used to quantify and classify the severity of each detected distress. This optimizes the computational complexity of the proposed system and significantly reduces the processing time as only extracted regions will be subject to subsequent processing. Experimental results demonstrate the effectiveness and accuracy of the proposed system in detecting 13 of the most frequent types of pavement distress classes and accurate severity classification for pothole distresses.",
+isbn="978-3-031-03918-8"
 }
+
