@@ -2,7 +2,7 @@
 ![Demo](https://github.com/hedeya1980/Images/blob/main/SDAIA_scene2_half_shorter.gif)
 
 ## Introduction:
-This is our submission for Theme #2 of [the Smart Cities Challenge (**Smartathon**) of SDAIA (Saudi Authority for Data and Artificial Intelligence) at HackerEarth](https://smartathon.hackerearth.com/)
+This is our submission for Theme #2 of [the Smart Cities Challenge (**Smartathon**) of **SDAIA** (Saudi Authority for Data and Artificial Intelligence) at **HackerEarth**](https://smartathon.hackerearth.com/)
 
 ## Pothole Detection:
 *	We trained YOLOv7 model using a ‘Pothole Detection Dataset’.
