@@ -25,7 +25,7 @@ This is our submission for Theme #2 of [the Smart Cities Challenge (**Smartathon
 *	Due to the competition timing constraints, we applied it to Scene 2 frames from frame# 279 to frame# 412.
 *	The results of Scene reconstruction were impressive as shown in the following figure for the resulting fused Point Cloud.
 
-![Original Scene](https://github.com/hedeya1980/Images/main/scene.png)
+![Original Scene](https://github.com/hedeya1980/Images/blob/main/scene.png)
 
 ## Proposed Pipeline:
 1.	The 2D images are fed into the trained YOLOv7 model.
@@ -39,10 +39,10 @@ This is our submission for Theme #2 of [the Smart Cities Challenge (**Smartathon
     3. From the pothole’s area, we estimate the average diameter of the pothole.
     4. The pothole’s volume is estimated using the pothole’s area as well and distances of the pothole points from the road plane.
 4.	We follow the following chart to classify Potholes into ‘Low’, ‘Medium’, and ‘High’ in terms of severity, and hence decide which segments of the road need urgent maintenance:
-![Severity Classification Metrics](https://github.com/hedeya1980/Images/main/severity.png)
+![Severity Classification Metrics](https://github.com/hedeya1980/Images/blob/main/severity.png)
 5.	The pipeline is illustrated in the following figure:
 
-![Proposed Pipeline](https://github.com/hedeya1980/Images/main/pipeline.png)
+![Proposed Pipeline](https://github.com/hedeya1980/Images/blob/main/pipeline.png)
 
 ## Prototype:
 1.	In the submitted prototype, we illustrate the Point Cloud processing steps explained above.
@@ -51,7 +51,7 @@ This is our submission for Theme #2 of [the Smart Cities Challenge (**Smartathon
 4.	Although we used the metric units to record our pothole measurements, it’s worth mentioning that the units resulting from COLMAP are arbitrary units. So, the achieved measurements may need to be rescaled using objects from the scene with well known actual measurements (such as cars).
 ![Point Cloud After Processing](https://github.com/hedeya1980/Images/blob/main/processed_scene.png)
 5.	Here is a link the resulting log: https://drive.google.com/file/d/1AWIIb6z22AqvqQrPiUIcTQbhbq2EiB6D/view?usp=share_link, and here is a screenshot for your easy reference:
-![log screenshot](https://github.com/hedeya1980/Images/main/log2.png)
+![log screenshot](https://github.com/hedeya1980/Images/blob/main/log2.png)
 
 # Prototype Installation:
 1. Pls download and extract [this file](https://drive.google.com/file/d/1AUF5RCf9uhvGzKIf5RreTHtXWKXzxu7j/view?usp=share_link).
