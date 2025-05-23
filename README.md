@@ -24,9 +24,8 @@ This is our submission for Theme #2 of [the Smart Cities Challenge (**Smartathon
 *	COLMAP is a general-purpose Structure-from-Motion (SfM) and Multi-View Stereo (MVS) pipeline with a graphical and command-line interface. It offers a wide range of features for reconstruction of ordered and unordered image collections.
 *	Due to the competition timing constraints, we applied it to Scene 2 frames from frame# 279 to frame# 412.
 *	The results of Scene reconstruction were impressive as shown in the following figure for the resulting fused Point Cloud.
-<p>
-    <img src="https://raw.githubusercontent.com/hedeya1980/Images/main/scene.png" width="1000" height="520" />
-</p>
+
+![Original Scene](https://raw.githubusercontent.com/hedeya1980/Images/main/scene.png)
 
 ## Proposed Pipeline:
 1.	The 2D images are fed into the trained YOLOv7 model.
